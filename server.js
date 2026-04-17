@@ -457,11 +457,13 @@ app.post('/api/watcher/start', (req, res) => {
       if (!fs.existsSync(filePath)) { seen.delete(filename); return; }
       const addArgs = [
         '-e', 'on run argv',
+        '-e', 'set theFile to POSIX file (item 1 of argv)',
         '-e', 'tell application "Music"',
         '-e', 'if not (exists user playlist (item 2 of argv)) then',
         '-e', 'make new user playlist with properties {name:(item 2 of argv)}',
         '-e', 'end if',
-        '-e', 'add (POSIX file (item 1 of argv)) to user playlist (item 2 of argv)',
+        '-e', 'set thePlaylist to user playlist (item 2 of argv)',
+        '-e', 'add theFile to thePlaylist',
         '-e', 'end tell',
         '-e', 'end run',
         filePath,
@@ -607,7 +609,29 @@ app.get('/api/smart-playlists/:id/resolve', (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Resolution failed' }); }
 });
 
-// ==================== Import to Apple Music (SSE) ====================
+// ==================== Apple Music Playlist Check ====================
+app.get('/api/apple-music-check', (req, res) => {
+  const { name } = req.query;
+  if (!name) return res.status(400).json({ error: 'Missing name' });
+  const args = [
+    '-e', 'on run argv',
+    '-e', 'tell application "Music"',
+    '-e', 'if not (exists user playlist (item 1 of argv)) then return "NOT_FOUND"',
+    '-e', 'return (count of tracks of user playlist (item 1 of argv)) as text',
+    '-e', 'end tell',
+    '-e', 'end run',
+    name
+  ];
+  execFile('osascript', args, { timeout: 15000 }, (err, stdout) => {
+    if (err) return res.json({ exists: false, trackCount: 0 });
+    const result = (stdout || '').trim();
+    if (result === 'NOT_FOUND' || !result) return res.json({ exists: false, trackCount: 0 });
+    const trackCount = parseInt(result);
+    res.json({ exists: !isNaN(trackCount), trackCount: isNaN(trackCount) ? 0 : trackCount });
+  });
+});
+
+// ==================== Import to Apple Music (SSE - dedup) ====================
 app.post('/api/import-to-apple-music', (req, res) => {
   const { playlistName } = req.body;
   if (!playlistName) return res.status(400).json({ error: 'Missing playlist name' });
@@ -624,72 +648,108 @@ app.post('/api/import-to-apple-music', (req, res) => {
   res.flushHeaders();
 
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  send('start', { total: audioFiles.length, playlistName });
 
-  let imported = 0;
-  let errors = 0;
-  const errorFiles = [];
-
-  // Step 1: Create playlist (using argv to avoid ALL escaping issues)
-  const createArgs = [
+  // Step 0: Get existing track file paths from Apple Music to avoid duplicates
+  const checkArgs = [
     '-e', 'on run argv',
     '-e', 'tell application "Music"',
-    '-e', 'activate',
-    '-e', 'if not (exists user playlist (item 1 of argv)) then',
-    '-e', 'make new user playlist with properties {name:(item 1 of argv)}',
-    '-e', 'end if',
+    '-e', 'if not (exists user playlist (item 1 of argv)) then return ""',
+    '-e', 'set output to ""',
+    '-e', 'repeat with t in every file track of user playlist (item 1 of argv)',
+    '-e', 'try',
+    '-e', 'set output to output & (POSIX path of (get location of t)) & linefeed',
+    '-e', 'end try',
+    '-e', 'end repeat',
+    '-e', 'return output',
     '-e', 'end tell',
     '-e', 'end run',
     playlistName
   ];
 
-  execFile('osascript', createArgs, { timeout: 30000 }, (err) => {
-    if (err) {
-      send('error', { message: 'Failed to create playlist: ' + err.message });
+  execFile('osascript', checkArgs, { timeout: 120000 }, (err, stdout) => {
+    const existingPaths = new Set();
+    if (!err && stdout) {
+      stdout.split('\n').forEach(p => { const t = p.trim(); if (t) existingPaths.add(t); });
+    }
+
+    // Filter out files already in the Apple Music playlist
+    const filesToImport = audioFiles.filter(f => !existingPaths.has(f));
+    const skipped = audioFiles.length - filesToImport.length;
+
+    send('start', { total: audioFiles.length, playlistName, skipped, toImport: filesToImport.length });
+
+    if (filesToImport.length === 0) {
+      send('done', {
+        message: `All ${audioFiles.length} tracks already exist in "${playlistName}". Nothing new to import.`,
+        playlistName, imported: 0, errors: 0, skipped, total: audioFiles.length
+      });
       return res.end();
     }
 
-    // Step 2: Add files one by one using argv (no escaping issues with special chars)
-    const addNext = (index) => {
-      if (index >= audioFiles.length) {
-        send('done', {
-          message: `Imported ${imported}/${audioFiles.length} tracks to "${playlistName}"${errors > 0 ? ` (${errors} failed)` : ''}`,
-          playlistName, imported, errors, total: audioFiles.length,
-          errorFiles: errorFiles.slice(0, 20)
-        });
+    let imported = 0;
+    let errors = 0;
+    const errorFiles = [];
+
+    // Step 1: Create playlist if needed
+    const createArgs = [
+      '-e', 'on run argv',
+      '-e', 'tell application "Music"',
+      '-e', 'activate',
+      '-e', 'if not (exists user playlist (item 1 of argv)) then',
+      '-e', 'make new user playlist with properties {name:(item 1 of argv)}',
+      '-e', 'end if',
+      '-e', 'end tell',
+      '-e', 'end run',
+      playlistName
+    ];
+
+    execFile('osascript', createArgs, { timeout: 30000 }, (err) => {
+      if (err) {
+        send('error', { message: 'Failed to create playlist: ' + err.message });
         return res.end();
       }
 
-      const filePath = audioFiles[index];
-      const fileName = path.basename(filePath, path.extname(filePath));
-      send('progress', { current: index + 1, total: audioFiles.length, title: fileName, status: 'importing', imported, errors });
-
-      // Use on run argv to pass file path and playlist name as arguments
-      // This completely avoids AppleScript string escaping issues with special characters
-      const addArgs = [
-        '-e', 'on run argv',
-        '-e', 'tell application "Music"',
-        '-e', 'add (POSIX file (item 1 of argv)) to user playlist (item 2 of argv)',
-        '-e', 'end tell',
-        '-e', 'end run',
-        filePath,
-        playlistName
-      ];
-
-      execFile('osascript', addArgs, { timeout: 30000 }, (err) => {
-        if (err) {
-          errors++;
-          errorFiles.push(fileName);
-          send('progress', { current: index + 1, total: audioFiles.length, title: fileName, status: 'error', imported, errors });
-        } else {
-          imported++;
-          send('progress', { current: index + 1, total: audioFiles.length, title: fileName, status: 'done', imported, errors });
+      // Step 2: Add only NEW files
+      const addNext = (index) => {
+        if (index >= filesToImport.length) {
+          send('done', {
+            message: `Imported ${imported}/${filesToImport.length} new tracks to "${playlistName}"${skipped ? ` (${skipped} already existed)` : ''}${errors > 0 ? ` (${errors} failed)` : ''}`,
+            playlistName, imported, errors, skipped, total: audioFiles.length,
+            errorFiles: errorFiles.slice(0, 20)
+          });
+          return res.end();
         }
-        // Small delay to not overwhelm Apple Music
-        setTimeout(() => addNext(index + 1), 150);
-      });
-    };
-    addNext(0);
+
+        const filePath = filesToImport[index];
+        const fileName = path.basename(filePath, path.extname(filePath));
+        send('progress', { current: index + 1, total: filesToImport.length, title: fileName, status: 'importing', imported, errors, skipped });
+
+        const addArgs = [
+          '-e', 'on run argv',
+          '-e', 'set theFile to POSIX file (item 1 of argv)',
+          '-e', 'tell application "Music"',
+          '-e', 'set thePlaylist to user playlist (item 2 of argv)',
+          '-e', 'add theFile to thePlaylist',
+          '-e', 'end tell',
+          '-e', 'end run',
+          filePath,
+          playlistName
+        ];
+
+        execFile('osascript', addArgs, { timeout: 30000 }, (err) => {
+          if (err) {
+            errors++;
+            errorFiles.push(fileName);
+            send('progress', { current: index + 1, total: filesToImport.length, title: fileName, status: 'error', imported, errors, skipped });
+          } else {
+            imported++;
+            send('progress', { current: index + 1, total: filesToImport.length, title: fileName, status: 'done', imported, errors, skipped });
+          }
+          setTimeout(() => addNext(index + 1), 150);
+        });
+      };
+      addNext(0);
+    });
   });
 });
 

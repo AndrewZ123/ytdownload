@@ -364,6 +364,7 @@ function switchTab(tab){
 // ═══════════ HELPERS ═══════════
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function escA(s){return s.replace(/'/g,"\\'").replace(/"/g,'"')}
+function safeId(s){return s.replace(/[^a-zA-Z0-9]/g,'_')}
 function $(id){return document.getElementById(id)}
 function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB'}
 function fmtDur(s){if(!s)return'';const m=Math.floor(s/60);return m+':'+(s%60).toString().padStart(2,'0')}
@@ -427,7 +428,7 @@ async function startBatchDownload(){
 }
 
 function updateDlItem(prefix,data){
-  const list=$('downloadList');let item=$(prefix+'-'+data.current);
+  const list=$(prefix==='dl'?'downloadList':'importList');let item=$(prefix+'-'+data.current);
   if(!item){item=document.createElement('div');item.id=prefix+'-'+data.current;item.className='download-item';list.appendChild(item)}
   const icons={downloading:'<span class="spinner"></span>',done:'<span class="status-icon status-done">✓</span>',error:'<span class="status-icon status-error">✗</span>',importing:'<span class="spinner"></span>'};
   const cls=data.status==='error'?'color:#f87171':'';
@@ -682,13 +683,22 @@ async function loadImportPlaylists(){
   try{const r=await fetch('/api/downloaded-playlists');const d=await r.json();
   if(!d.playlists.length){c.innerHTML='<div class="empty-state"><div class="icon">📭</div><p>No playlists. Download one first!</p></div>';return}
   c.innerHTML='';d.playlists.forEach(p=>{
-    const it=document.createElement('div');it.className='playlist-item';it.id='imp-item-'+escA(p.name);
-    it.innerHTML='<div class="playlist-info"><div class="playlist-name">📁 '+esc(p.name)+'</div><div class="playlist-meta">'+p.trackCount+' tracks</div></div><div class="playlist-actions"><span id="imp-badge-'+escA(p.name)+'" class="'+(importedSet.has(p.name)?'badge badge-green':'hidden')+'">'+(importedSet.has(p.name)?'✓ Imported':'')+'</span><button class="btn-green btn-sm" id="imp-btn-'+escA(p.name)+'" onclick="importPlaylist(\''+escA(p.name)+'\')" '+(importedSet.has(p.name)?'disabled':'')+'>🍎 Import</button></div>';
-    c.appendChild(it)
+    const sid=safeId(p.name);
+    const it=document.createElement('div');it.className='playlist-item';it.id='imp-item-'+sid;
+    it.innerHTML='<div class="playlist-info"><div class="playlist-name">📁 '+esc(p.name)+'</div><div class="playlist-meta">'+p.trackCount+' tracks <span id="imp-aminfo-'+sid+'"></span></div></div><div class="playlist-actions"><span id="imp-badge-'+sid+'" class="'+(importedSet.has(p.name)?'badge badge-green':'hidden')+'">'+(importedSet.has(p.name)?'✓ Imported':'')+'</span><button class="btn-green btn-sm" id="imp-btn-'+sid+'" onclick="importPlaylist(\''+escA(p.name)+'\')" '+(importedSet.has(p.name)?'disabled':'')+'>🍎 Import</button></div>';
+    c.appendChild(it);
+    checkAppleMusicPlaylist(p.name,sid)
   })}catch(_){c.innerHTML='<div class="error-box">Connection error</div>'}
 }
+async function checkAppleMusicPlaylist(name,sid){
+  const el=$('imp-aminfo-'+sid);if(!el)return;
+  try{const r=await fetch('/api/apple-music-check?name='+encodeURIComponent(name));const d=await r.json();
+    if(d.exists){el.innerHTML='<span class="badge badge-yellow" style="margin-left:6px">🍎 '+d.trackCount+' in Apple Music (will skip duplicates)</span>'}
+    else{el.innerHTML='<span class="badge badge-green" style="margin-left:6px">🆕 New</span>'}
+  }catch(_){}
+}
 function importPlaylist(name){
-  const btn=$('imp-btn-'+name);const badge=$('imp-badge-'+name);
+  const sid=safeId(name);const btn=$('imp-btn-'+sid);const badge=$('imp-badge-'+sid);
   btn.disabled=true;btn.textContent='⏳...';badge.className='badge badge-yellow';badge.textContent='Importing...';
   $('importStatusSection').classList.add('visible');$('importDoneCard').classList.add('hidden');
   $('importList').innerHTML='';$('importProgressBar').style.width='0%';
