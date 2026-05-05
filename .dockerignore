@@ -1,0 +1,9 @@
+node_modules
+downloads
+.git
+ios-app
+config.json
+*.mp3
+*.m4a
+*.flac
+*.wav

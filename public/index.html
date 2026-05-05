@@ -132,6 +132,17 @@ button{padding:12px 24px;border:none;border-radius:12px;font-size:.9rem;font-wei
 <div id="doneCard" class="card hidden"><div class="summary" id="doneSummary"></div></div>
 </div>
 
+<!-- Spotify Quick Download -->
+<div class="card" style="margin-top:16px">
+<div class="card-title">🟢 Spotify Playlist Download</div>
+<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px">Paste a Spotify playlist link to download all songs from YouTube.</p>
+<div class="input-group" style="margin-bottom:0">
+<input type="text" id="spotifyQuickUrl" placeholder="https://open.spotify.com/playlist/..." onkeydown="if(event.key==='Enter')spotifyQuickLoad()"/>
+<button class="btn-green btn-sm" onclick="spotifyQuickLoad()">🟢 Load & Download</button>
+</div>
+<div id="spotifyQuickResults" class="hidden" style="margin-top:12px"></div>
+</div>
+
 <!-- Feature 1: Batch Download -->
 <div class="card" style="margin-top:16px">
 <div class="card-title">📥 Batch URL Download</div>
@@ -288,16 +299,21 @@ button{padding:12px 24px;border:none;border-radius:12px;font-size:.9rem;font-wei
 
 <!-- ═══════════ TOOLS TAB (F2 Spotify, F9 Watcher, F11 API) ═══════════ -->
 <div id="tab-tools" class="tab-content">
-<!-- Feature 2: Spotify -->
-<div class="card">
-<div class="card-title">🟢 Spotify Import</div>
-<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px">Paste a Spotify playlist URL to find and download songs from YouTube.</p>
-<div class="input-group" style="margin-bottom:0">
-<input type="text" id="spotifyUrl" placeholder="https://open.spotify.com/playlist/..." />
-<button class="btn-green btn-sm" id="spotifyBtn" onclick="loadSpotifyPlaylist()">Load</button>
-</div>
-<div id="spotifyResults" class="hidden" style="margin-top:12px"></div>
-</div>
+  <!-- Feature 2: Spotify -->
+  <div class="card">
+  <div class="card-title">🟢 Spotify Import</div>
+  <p style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px">Paste a Spotify playlist URL to find and download songs from YouTube.</p>
+  <div class="input-group" style="margin-bottom:0">
+  <input type="text" id="spotifyUrl" placeholder="https://open.spotify.com/playlist/..." onkeydown="if(event.key==='Enter')loadSpotifyPlaylist()"/>
+  <button class="btn-green btn-sm" id="spotifyBtn" onclick="loadSpotifyPlaylist()">Load</button>
+  </div>
+  <div id="spotifyResults" class="hidden" style="margin-top:12px"></div>
+  <div id="spotifyStatusSection" class="hidden" style="margin-top:12px">
+    <div class="progress-bar-container"><div class="progress-bar green" id="spotifyProgressBar"></div></div>
+    <p id="spotifyProgressText" style="color:#a5a3c9;font-size:.8rem;margin-bottom:8px"></p>
+    <div id="spotifyDownloadList" style="max-height:200px;overflow-y:auto"></div>
+  </div>
+  </div>
 
 <!-- Feature 9: Auto-Import Watcher -->
 <div class="card">
@@ -642,9 +658,29 @@ async function loadSpotifyPlaylist(){
   }catch(e){$('spotifyResults').innerHTML='<div class="error-box">Failed. yt-dlp may not support Spotify directly.</div>'}finally{btn.disabled=false;btn.textContent='Load'}
 }
 async function downloadSpotifyAsPlaylist(){
-  const name=$('spotifyPlaylistName').value.trim();if(!name)return;
-  // This would need the spotify track IDs to download individually - simplified version
-  alert('Spotify download uses yt-dlp Spotify support. Make sure spotDL is installed.');
+  const url=$('spotifyUrl').value.trim();if(!url)return;
+  const name=$('spotifyPlaylistName')?$('spotifyPlaylistName').value.trim():'';
+  if(!name){alert('Enter a playlist name');return}
+  const fmt=$('dlFormat').value;const q=$('dlQuality').value;
+  $('spotifyStatusSection').classList.remove('hidden');
+  $('spotifyProgressBar').style.width='0%';
+  $('spotifyProgressText').textContent='Starting Spotify download...';
+  $('spotifyDownloadList').innerHTML='';
+  const es=new EventSource('/api/spotify-download?url='+encodeURIComponent(url)+'&format='+fmt+'&quality='+q);
+  es.addEventListener('playlist',e=>{const d=JSON.parse(e.data);$('spotifyProgressText').textContent='0 / '+d.total+' tracks'});
+  es.addEventListener('progress',e=>{const d=JSON.parse(e.data);
+    if(d.total){const p=Math.round(d.current/d.total*100);$('spotifyProgressBar').style.width=p+'%';
+    $('spotifyProgressText').textContent=d.current+' / '+d.total+(d.status==='searching'?' 🔍 Searching...':d.status==='downloading'?' ⬇️ Downloading...':'')}
+    const icons={searching:'🔍',downloading:'<span class="spinner"></span>',done:'<span class="status-icon status-done">✓</span>',error:'<span class="status-icon status-error">✗</span>'};
+    let item=document.getElementById('sp-'+d.current);
+    if(!item){item=document.createElement('div');item.id='sp-'+d.current;item.className='download-item';$('spotifyDownloadList').appendChild(item)}
+    const cls=d.status==='error'?'color:#f87171':'';
+    item.innerHTML=(icons[d.status]||'')+'<span class="download-title" style="'+cls+'">'+esc(d.title||'')+'</span>';
+    item.scrollIntoView({behavior:'smooth',block:'end'});
+  });
+  es.addEventListener('error',e=>{const d=JSON.parse(e.data);$('spotifyProgressText').innerHTML='<span style="color:#f87171">'+esc(d.message)+'</span>';es.close()});
+  es.addEventListener('done',e=>{const d=JSON.parse(e.data);$('spotifyProgressText').innerHTML='<span style="color:#34d399">✅ '+esc(d.message)+'</span>';es.close()});
+  es.onerror=()=>{es.close()};
 }
 // Feature 9: Watcher
 async function loadWatcherPlaylists(){
@@ -749,6 +785,46 @@ async function downloadAllSuggested(){
     done++;btn.textContent='⏳ '+Math.round(done/total*100)+'%';
   }
   btn.textContent='✅ '+done+' downloaded!';btn.disabled=false;
+}
+
+// ═══════════ SPOTIFY QUICK DOWNLOAD (Download Tab) ═══════════
+async function spotifyQuickLoad(){
+  const url=$('spotifyQuickUrl').value.trim();if(!url)return;
+  const el=$('spotifyQuickResults');el.classList.remove('hidden');
+  el.innerHTML='<span class="spinner"></span> Loading playlist from Spotify...';
+  try{
+    const r=await fetch('/api/spotify-playlist?url='+encodeURIComponent(url));const d=await r.json();
+    if(!r.ok){el.innerHTML='<div class="error-box">'+esc(d.error)+'</div>';return}
+    let html='<div style="margin-bottom:12px"><strong style="font-size:.95rem">🟢 '+esc(d.title)+'</strong><br><span style="color:#a5a3c9;font-size:.8rem">'+d.count+' tracks found</span></div>';
+    html+='<div style="max-height:150px;overflow-y:auto;margin-bottom:12px">';
+    d.tracks.slice(0,20).forEach(t=>{html+='<div class="download-item"><span class="track-num" style="min-width:20px">'+t.index+'.</span><span class="download-title" style="font-size:.8rem">'+esc(t.title)+' <span style="color:#7a78a0">'+esc(t.artist)+'</span></span></div>'});
+    if(d.count>20)html+='<div style="color:#7a78a0;font-size:.75rem;text-align:center;padding:4px">...and '+(d.count-20)+' more tracks</div>';
+    html+='</div>';
+    html+='<div class="progress-bar-container"><div class="progress-bar green" id="spqBar"></div></div>';
+    html+='<p id="spqText" style="color:#a5a3c9;font-size:.8rem;margin-bottom:8px"></p>';
+    html+='<div id="spqList" style="max-height:200px;overflow-y:auto"></div>';
+    html+='<div style="margin-top:10px;text-align:center"><button class="btn-green btn-sm" id="spqBtn" onclick="spotifyQuickDownload()">⬇️ Download All '+d.count+' Tracks</button></div>';
+    el.innerHTML=html;
+    window._spqUrl=url;
+  }catch(e){el.innerHTML='<div class="error-box">Failed to load Spotify playlist</div>'}
+}
+async function spotifyQuickDownload(){
+  const url=window._spqUrl;if(!url)return;
+  const btn=$('spqBtn');btn.disabled=true;btn.textContent='⏳ Downloading...';
+  const fmt=$('dlFormat').value;const q=$('dlQuality').value;
+  const es=new EventSource('/api/spotify-download?url='+encodeURIComponent(url)+'&format='+fmt+'&quality='+q);
+  es.addEventListener('playlist',e=>{const d=JSON.parse(e.data);$('spqText').textContent='0 / '+d.total+' tracks'});
+  es.addEventListener('progress',e=>{const d=JSON.parse(e.data);
+    if(d.total){const p=Math.round(d.current/d.total*100);$('spqBar').style.width=p+'%';$('spqText').textContent=d.current+' / '+d.total+' — '+esc(d.title||'')}
+    const icons={searching:'🔍',downloading:'<span class="spinner"></span>',done:'<span class="status-icon status-done">✓</span>',error:'<span class="status-icon status-error">✗</span>'};
+    let item=document.getElementById('spq-'+d.current);
+    if(!item){item=document.createElement('div');item.id='spq-'+d.current;item.className='download-item';$('spqList').appendChild(item)}
+    item.innerHTML=(icons[d.status]||'')+'<span class="download-title" style="'+(d.status==='error'?'color:#f87171':'')+'">'+esc(d.title||'')+'</span>';
+    item.scrollIntoView({behavior:'smooth',block:'end'});
+  });
+  es.addEventListener('error',e=>{$('spqText').innerHTML='<span style="color:#f87171">'+esc(JSON.parse(e.data).message)+'</span>';es.close();btn.disabled=false;btn.textContent='⬇️ Retry'});
+  es.addEventListener('done',e=>{const d=JSON.parse(e.data);$('spqText').innerHTML='<span style="color:#34d399">✅ '+esc(d.message)+'</span>';es.close();btn.textContent='✅ Done!';btn.disabled=true});
+  es.onerror=()=>{es.close();btn.disabled=false;btn.textContent='⬇️ Retry'}
 }
 
 // ═══════════ INIT ═══════════

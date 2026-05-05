@@ -1,0 +1,11 @@
+{
+  "appId": "com.ytmusic.app",
+  "appName": "My Music",
+  "webDir": "web",
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+    "allowsLinkPreview": false
+  }
+}

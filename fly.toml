@@ -1,0 +1,25 @@
+# fly.toml - Fly.io deployment config
+# Deploy with: fly deploy
+
+app = "ytdownload-music"
+primary_region = "ewr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+# Persistent storage for downloaded music (1GB free)
+[mounts]
+  source = "ytmusic_data"
+  destination = "/app/downloads"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

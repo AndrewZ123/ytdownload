@@ -1,0 +1,13 @@
+{
+  "name": "My Music",
+  "short_name": "Music",
+  "description": "Personal music library powered by YouTube",
+  "start_url": "/player",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#fc3c44",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23fc3c44' width='100' height='100' rx='22'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white'>♪</text></svg>", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

@@ -1,0 +1,17 @@
+# render.yaml - Render.com deployment config (free tier)
+# Deploy by connecting your GitHub repo at https://dashboard.render.com
+
+services:
+  - type: web
+    name: ytdownload-music
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/chromium
+    # Free tier: spins down after 15 min inactivity, 750 hrs/month
+    # Render free disk is ephemeral - use for testing

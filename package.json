@@ -6,11 +6,20 @@
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": ["youtube", "music", "downloader", "yt-dlp", "apple-music", "playlist", "mp3"],
+  "keywords": [
+    "youtube",
+    "music",
+    "downloader",
+    "yt-dlp",
+    "apple-music",
+    "playlist",
+    "mp3"
+  ],
   "author": "",
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "puppeteer-core": "^24.42.0"
   }
 }
