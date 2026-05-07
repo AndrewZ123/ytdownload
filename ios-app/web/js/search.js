@@ -125,7 +125,7 @@ function playSearchResult(idx) {
             queue[queueIndex].title = currentSong.title;
             queue[queueIndex].artist = currentSong.artist;
           }
-          if (typeof updateNowPlaying === 'function') updateNowPlaying();
+          if (typeof updateNowPlayingInfo === 'function') updateNowPlayingInfo();
         }
       })
       .catch(() => {});

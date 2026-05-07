@@ -61,65 +61,81 @@ function resolveStreamUrl(videoId) {
 }
 
 // ==================== YouTube Proxy Streaming ====================
-// Stream audio by piping yt-dlp output directly (CDN URLs are IP-bound to proxy, only yt-dlp can fetch them)
-app.get('/api/youtube/stream/:videoId', (req, res) => {
+// Resolve CDN URL, then proxy it with Range support for seeking
+
+// Follow HTTP redirects (Node http/https don't follow automatically)
+function httpFollow(url, options = {}, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const requester = parsedUrl.protocol === 'https:' ? https : http;
+    requester.get(url, options, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        if (maxRedirects <= 0) { res.resume(); return reject(new Error('Too many redirects')); }
+        const redirectUrl = new URL(res.headers.location, url).href;
+        res.resume();
+        return httpFollow(redirectUrl, options, maxRedirects - 1).then(resolve).catch(reject);
+      }
+      resolve(res);
+    }).on('error', reject);
+  });
+}
+
+app.get('/api/youtube/stream/:videoId', async (req, res) => {
   const { videoId } = req.params;
   if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
     return res.status(400).json({ error: 'Invalid video ID' });
   }
 
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
-  console.log(`[stream] Starting pipe stream for ${videoId}`);
+  try {
+    // Step 1: Resolve CDN URL (cached for 4 hours)
+    const cdnUrl = await resolveStreamUrl(videoId);
+    console.log(`[stream] Proxying CDN for ${videoId}`);
 
-  // Use yt-dlp to pipe audio directly to stdout - it handles proxy/CDN negotiation
-  const ytdlp = spawn('yt-dlp', [
-    '-f', 'bestaudio[ext=m4a]/bestaudio/best',
-    '--no-check-certificates', '--no-warnings',
-    '--no-playlist', '--prefer-free-formats',
-    '-o', '-',  // pipe to stdout
-    url
-  ]);
-
-  let headersSent = false;
-  let stderrData = '';
-
-  ytdlp.stderr.on('data', d => { stderrData += d.toString(); });
-
-  ytdlp.stdout.on('data', (chunk) => {
-    if (!headersSent) {
-      headersSent = true;
-      res.writeHead(200, {
-        'Content-Type': 'audio/mp4',
-        'Transfer-Encoding': 'chunked',
-        'Cache-Control': 'no-cache',
-        'Accept-Ranges': 'none'
-      });
+    // Step 2: Build request headers, forward Range for seeking
+    const reqHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+      'Accept-Encoding': 'identity', // no compression for audio streaming
+    };
+    if (req.headers.range) {
+      reqHeaders['Range'] = req.headers.range;
     }
-    res.write(chunk);
-  });
 
-  ytdlp.on('close', (code) => {
-    if (code !== 0 && !headersSent) {
-      console.error(`[stream] yt-dlp failed for ${videoId}: ${stderrData.slice(0, 200)}`);
-      if (!res.headersSent) res.status(502).json({ error: 'Stream failed' });
-    } else {
-      console.log(`[stream] Completed pipe stream for ${videoId}`);
-      res.end();
+    // Step 3: Fetch from CDN with redirect following
+    const cdnRes = await httpFollow(cdnUrl, { headers: reqHeaders });
+
+    if (cdnRes.statusCode >= 400) {
+      cdnRes.resume();
+      console.error(`[stream] CDN returned ${cdnRes.statusCode} for ${videoId}`);
+      if (!res.headersSent) res.status(cdnRes.statusCode).json({ error: 'CDN fetch failed' });
+      return;
     }
-  });
 
-  ytdlp.on('error', (err) => {
-    console.error(`[stream] spawn error for ${videoId}:`, err.message);
-    if (!res.headersSent) res.status(500).json({ error: 'Stream spawn failed' });
-  });
-
-  // Clean up if client disconnects
-  req.on('close', () => {
-    if (!ytdlp.killed) {
-      ytdlp.kill('SIGTERM');
-      console.log(`[stream] Client disconnected, killed yt-dlp for ${videoId}`);
+    // Step 4: Build response headers
+    const resHeaders = {
+      'Content-Type': cdnRes.headers['content-type'] || 'audio/mp4',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+      'Accept-Ranges': cdnRes.headers['accept-ranges'] || 'bytes',
+    };
+    if (cdnRes.headers['content-range']) {
+      resHeaders['Content-Range'] = cdnRes.headers['content-range'];
     }
-  });
+    if (cdnRes.headers['content-length']) {
+      resHeaders['Content-Length'] = cdnRes.headers['content-length'];
+    }
+
+    res.writeHead(cdnRes.statusCode, resHeaders);
+    cdnRes.pipe(res);
+
+    // Clean up on disconnect
+    req.on('close', () => {
+      cdnRes.destroy();
+    });
+  } catch(e) {
+    console.error(`[stream] Failed for ${videoId}:`, e.message);
+    if (!res.headersSent) res.status(502).json({ error: 'Could not stream: ' + e.message });
+  }
 });
 
 // Pre-cache stream URL for instant playback (called when user taps play)
