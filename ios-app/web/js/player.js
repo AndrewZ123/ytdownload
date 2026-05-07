@@ -68,22 +68,7 @@ async function playSong(song) {
   if (!offlineMode) {
     try {
       if (song.isStream && song.id) {
-        // Fetch CDN URL from server, then play directly from YouTube CDN (fast, no server bandwidth)
-        const res = await apiFetch(`${API}/api/youtube/stream-url/${song.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.streamUrl) {
-            audio.src = data.streamUrl;
-            await audio.play();
-            updatePlayerUI(false);
-            showMiniPlayer();
-            updateFpLikeBtn();
-            prebufferNext();
-            updateNowPlayingInfo();
-            return;
-          }
-        }
-        // Fallback to server proxy if CDN URL fails
+        // Stream through server proxy (CDN URLs are IP-bound, can't play directly)
         audio.src = `${API}/api/youtube/stream/${song.id}`;
       } else {
         audio.src = audioUrl(song);
