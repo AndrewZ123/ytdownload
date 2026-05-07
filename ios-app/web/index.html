@@ -1,658 +1,374 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="format-detection" content="telephone=no">
-<title>My Music</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-:root{--red:#fc3c44;--bg:#000;--card:#1c1c1e;--card2:#2c2c2e;--card3:#3a3a3c;--text:#fff;--text2:#8e8e93;--text3:#636366;--safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px)}
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',sans-serif}
-#app{display:flex;flex-direction:column;height:100%}
-
-/* Status bar space */
-.status-pad{height:var(--safe-t);flex-shrink:0;background:var(--bg)}
-
-/* Tab bar */
-.tab-bar{display:flex;background:rgba(28,28,30,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:.5px solid rgba(255,255,255,.08);padding-bottom:var(--safe-b);flex-shrink:0;z-index:100}
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;padding:6px 0 4px;color:var(--text3);cursor:pointer;transition:color .15s}
-.tab.active{color:var(--red)}
-.tab svg{width:24px;height:24px;margin-bottom:1px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.tab span{font-size:10px;font-weight:500}
-
-/* Pages */
-.pages{flex:1;overflow:hidden;position:relative}
-.page{position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none}
-.page.active{display:block}
-.page::-webkit-scrollbar{display:none}
-
-/* Header */
-.hdr{padding:8px 20px 10px;position:sticky;top:0;background:rgba(0,0,0,.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);z-index:10}
-.hdr h1{font-size:32px;font-weight:700;letter-spacing:.3px}
-.hdr-row{display:flex;justify-content:space-between;align-items:center}
-.hdr-row h1{flex:1}
-
-/* Search */
-.search-box{margin:6px 20px 10px;position:relative}
-.search-box input{width:100%;padding:10px 12px 10px 36px;background:var(--card2);border:none;border-radius:10px;color:#fff;font-size:16px;outline:none}
-.search-box input::placeholder{color:var(--text3)}
-.search-box .icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3)}
-
-/* Song rows */
-.songs{list-style:none}
-.srow{display:flex;align-items:center;padding:9px 20px;gap:12px;cursor:pointer;transition:background .12s;position:relative}
-.srow:active{background:var(--card)}
-.srow.playing .srow-title{color:var(--red)}
-.srow .art{width:50px;height:50px;border-radius:7px;background:var(--card2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
-.srow .art img{width:100%;height:100%;object-fit:cover}
-.srow .art .note{font-size:22px;opacity:.3}
-.srow-body{flex:1;min-width:0}
-.srow-title{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400}
-.srow-sub{font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
-.srow-btns{display:flex;gap:4px;flex-shrink:0;align-items:center}
-.srow-btns button,.srow-btns .dl-status{background:none;border:none;color:var(--text2);padding:8px;cursor:pointer;position:relative}
-.srow-btns svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.srow-btns .dl-btn{color:var(--red)}
-.srow-btns .dl-btn.downloaded{color:var(--red)}
-.srow-btns .spinner-sm{width:18px;height:18px;border:2px solid var(--card3);border-top-color:var(--red);border-radius:50%;animation:spin .6s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* EQ bars animation for playing indicator */
-.eq-bars{display:flex;align-items:flex-end;gap:2px;height:14px;width:14px}
-.eq-bars span{width:3px;background:var(--red);border-radius:1px;animation:eqBar .8s ease infinite alternate}
-.eq-bars span:nth-child(1){height:6px;animation-delay:0s}
-.eq-bars span:nth-child(2){height:10px;animation-delay:.2s}
-.eq-bars span:nth-child(3){height:4px;animation-delay:.4s}
-@keyframes eqBar{0%{height:3px}100%{height:14px}}
-
-/* Section */
-.sec{padding:20px 20px 6px}
-.sec h2{font-size:22px;font-weight:700}
-.sec-header{display:flex;justify-content:space-between;align-items:center;padding:20px 20px 6px}
-.sec-header h2{font-size:22px;font-weight:700}
-.sec-header .see-all{color:var(--red);font-size:15px;background:none;border:none;cursor:pointer}
-
-/* Artist cards */
-.artists-row{display:flex;gap:12px;padding:4px 20px 16px;overflow-x:auto;scrollbar-width:none}
-.artists-row::-webkit-scrollbar{display:none}
-.artist-card{flex-shrink:0;width:130px;text-align:center}
-.artist-card .avatar{width:130px;height:130px;border-radius:65px;background:var(--card2);overflow:hidden;margin-bottom:6px}
-.artist-card .avatar img{width:100%;height:100%;object-fit:cover}
-.artist-card .name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.artist-card .count{font-size:12px;color:var(--text2)}
-
-/* Mini player */
-.mini{display:none;height:64px;background:rgba(28,28,30,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:.5px solid rgba(255,255,255,.06);flex-shrink:0;align-items:center;padding:0 12px;gap:10px}
-.mini.show{display:flex}
-.mini .mart{width:44px;height:44px;border-radius:6px;background:var(--card2);overflow:hidden;flex-shrink:0}
-.mini .mart img{width:100%;height:100%;object-fit:cover}
-.mini-info{flex:1;min-width:0;cursor:pointer}
-.mini-title{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mini-artist{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mini-btns{display:flex;gap:0}
-.mini-btns button{background:none;border:none;color:#fff;padding:10px;cursor:pointer}
-.mini-btns svg{width:28px;height:28px;fill:currentColor;stroke:none}
-
-/* Full player */
-.fplayer{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.32,.72,0,1);will-change:transform}
-.fplayer.open{transform:translateY(0)}
-.fp-top{display:flex;justify-content:space-between;align-items:center;padding:calc(var(--safe-t)+8px) 20px 8px}
-.fp-top button{background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;padding:4px}
-.fp-top .label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;font-weight:600}
-.fp-cover{flex:1;display:flex;align-items:center;justify-content:center;padding:10px 30px}
-.fp-cover img{width:min(82vw,340px);height:min(82vw,340px);border-radius:14px;background:var(--card2);object-fit:cover;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.fp-meta{text-align:center;padding:0 30px}
-.fp-meta .title{font-size:21px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fp-meta .artist{font-size:17px;color:var(--red);margin-top:3px;cursor:pointer}
-.fp-prog{padding:16px 30px 4px}
-.fp-prog .track{width:100%;height:4px;background:var(--card3);border-radius:2px;position:relative;cursor:pointer}
-.fp-prog .fill{height:100%;background:#fff;border-radius:2px;width:0%;pointer-events:none}
-.fp-prog .knob{position:absolute;top:50%;width:10px;height:10px;background:#fff;border-radius:50%;transform:translate(-50%,-50%);left:0%;pointer-events:none}
-.fp-prog .times{display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums}
-.fp-ctrls{display:flex;align-items:center;justify-content:center;gap:36px;padding:8px 30px 12px}
-.fp-ctrls button{background:none;border:none;color:#fff;cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center}
-.fp-ctrls .main svg{width:52px;height:52px;fill:currentColor}
-.fp-ctrls .skip svg{width:34px;height:34px;fill:currentColor}
-.fp-ctrls .side{color:var(--text3)}
-.fp-ctrls .side.on{color:var(--red)}
-.fp-ctrls .side svg{width:22px;height:22px}
-.fp-bottom{display:flex;justify-content:space-between;padding:4px 30px calc(var(--safe-b)+20px)}
-.fp-bottom button{background:none;border:none;color:var(--text2);padding:6px;cursor:pointer}
-.fp-bottom button.saved{color:var(--red)}
-.fp-bottom svg{width:20px;height:20px}
-
-/* Empty / Loading */
-.empty{display:flex;flex-direction:column;align-items:center;padding:80px 40px;color:var(--text3);text-align:center;font-size:15px;line-height:1.5}
-.empty svg{width:44px;height:44px;margin-bottom:16px;opacity:.5}
-.loading-wrap{display:flex;justify-content:center;padding:40px}
-
-/* Settings modal */
-.modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:600;display:none;align-items:flex-end;justify-content:center}
-.modal-bg.open{display:flex}
-.modal{background:var(--card);border-radius:16px 16px 0 0;width:100%;max-height:70vh;padding:20px 20px calc(var(--safe-b)+20px);animation:slideUp .3s ease}
-@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.modal h3{font-size:18px;font-weight:600;margin-bottom:16px;text-align:center}
-.modal label{font-size:13px;color:var(--text2);display:block;margin-bottom:6px}
-.modal input{width:100%;padding:12px;background:var(--card2);border:none;border-radius:10px;color:#fff;font-size:15px;outline:none;margin-bottom:16px}
-.modal .save-btn{width:100%;padding:14px;background:var(--red);border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
-.modal .close-modal{width:100%;padding:12px;background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;margin-top:8px}
-
-/* Download progress overlay */
-.dl-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:700;display:none;align-items:center;justify-content:center}
-.dl-overlay.show{display:flex}
-.dl-card{background:var(--card);border-radius:20px;padding:32px 28px;width:min(85vw,300px);text-align:center}
-.dl-card .dl-spinner{width:44px;height:44px;border:3px solid var(--card3);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 16px}
-.dl-card .dl-title{font-size:16px;font-weight:500;margin-bottom:4px}
-.dl-card .dl-sub{font-size:13px;color:var(--text2)}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Music</title>
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<div id="app">
-  <div class="status-pad"></div>
 
-  <!-- Pages -->
-  <div class="pages">
-    <!-- Search -->
-    <div class="page active" id="pg-search">
-      <div class="hdr"><h1>Search</h1></div>
-      <div class="search-box">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="q" type="text" placeholder="Songs, artists, albums..." autocomplete="off">
+<!-- ===== SVG ICON SPRITE ===== -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="icon-tab-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></symbol>
+  <symbol id="icon-tab-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></symbol>
+  <symbol id="icon-tab-library" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h3v3H7zM14 7h3v3h-3zM7 14h3v3H7zM14 14h3v3h-3z"/></symbol>
+  <symbol id="icon-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+  <symbol id="icon-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></symbol>
+  <symbol id="icon-heart-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></symbol>
+  <symbol id="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></symbol>
+  <symbol id="icon-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></symbol>
+  <symbol id="icon-skip-back" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="icon-skip-forward" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="icon-shuffle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></symbol>
+  <symbol id="icon-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></symbol>
+  <symbol id="icon-more" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></symbol>
+  <symbol id="icon-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="icon-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="icon-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="icon-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="icon-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
+  <symbol id="icon-music" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="icon-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></symbol>
+  <symbol id="icon-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></symbol>
+  <symbol id="icon-volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></symbol>
+  <symbol id="icon-speed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></symbol>
+  <symbol id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></symbol>
+  <symbol id="icon-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="icon-repeat-one" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/><text x="12" y="15" text-anchor="middle" font-size="8" fill="currentColor" stroke="none" font-weight="bold">1</text></symbol>
+  <symbol id="icon-tab-browse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></symbol>
+  <symbol id="icon-wifi-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M10.71 5.05A16 16 0 0122.56 9"/><path d="M1.42 9a15.91 15.91 0 014.7-2.88"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></symbol>
+</svg>
+
+<!-- ===== OFFLINE BANNER ===== -->
+<div id="offlineBanner" class="offline-banner" style="display:none">
+  <svg class="icon-sm"><use href="#icon-x"/></svg>
+  <span>You are offline</span>
+</div>
+
+<!-- ===== PULL TO REFRESH ===== -->
+<div id="pullToRefresh" class="pull-to-refresh"><span class="ptr-text">Pull to refresh</span></div>
+
+<!-- ===== PAGES ===== -->
+
+<!-- LISTEN NOW -->
+<div id="pageNowPlaying" class="page active">
+  <div class="scroll-content">
+    <div class="page-header">
+      <h1 class="page-title">Listen Now</h1>
+      <button class="icon-btn" onclick="showSettings()" aria-label="Settings"><svg class="icon-md"><use href="#icon-settings"/></svg></button>
+    </div>
+
+    <div id="likedCard" class="liked-card" onclick="openLikedSongs()" style="display:none">
+      <div class="liked-bg"></div>
+      <div class="liked-content">
+        <svg class="icon-md" style="color:#fc3c44"><use href="#icon-heart-filled"/></svg>
+        <div>
+          <div class="liked-label">Liked Songs</div>
+          <div class="liked-count"></div>
+        </div>
       </div>
-      <div id="results"></div>
     </div>
 
-    <!-- Library -->
-    <div class="page" id="pg-library">
-      <div class="hdr"><div class="hdr-row"><h1>Library</h1><button id="settings-btn" style="background:none;border:none;color:var(--text2);padding:4px;cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div></div>
-      <div id="artists-sec" style="display:none">
-        <div class="sec-header"><h2>Artists</h2></div>
-        <div id="artists-row" class="artists-row"></div>
+    <section class="section">
+      <div class="section-header"><h2>Recently Added</h2></div>
+      <div id="recentGrid" class="card-grid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-header"><h2>History</h2></div>
+      <div id="historyGrid" class="card-grid"></div>
+    </section>
+  </div>
+</div>
+
+<!-- BROWSE -->
+<div id="pageBrowse" class="page">
+  <div class="scroll-content">
+    <div class="page-header"><h1 class="page-title">Browse</h1></div>
+    <section class="section">
+      <div class="section-header"><h2>Recently Played</h2></div>
+      <div id="browseRecentlyPlayed" class="card-grid"></div>
+    </section>
+    <section class="section">
+      <div class="section-header"><h2>Liked Picks</h2></div>
+      <div id="browseLikedPicks" class="card-grid"></div>
+    </section>
+    <section class="section">
+      <div class="section-header"><h2>Top Artists</h2></div>
+      <div id="browseTopArtists" class="card-grid"></div>
+    </section>
+    <section class="section">
+      <div class="section-header"><h2>New Releases</h2></div>
+      <div id="browseNewReleases" class="card-grid"></div>
+    </section>
+    <section class="section">
+      <div class="section-header"><h2>Explore Albums</h2></div>
+      <div id="browseExploreAlbums" class="card-grid"></div>
+    </section>
+    <section class="section">
+      <div class="section-header"><h2>Made For You</h2></div>
+      <div id="browseMadeForYou" class="browse-made-for-you"></div>
+    </section>
+
+    <!-- Discovery sections: smart suggestions from server -->
+    <div id="browseDiscovery"></div>
+  </div>
+</div>
+
+<!-- LIBRARY -->
+<div id="pageLibrary" class="page">
+  <div class="scroll-content">
+    <div class="page-header"><h1 class="page-title">Library</h1></div>
+    <div class="lib-segments">
+      <div class="seg-track">
+        <button class="seg-btn active" data-tab="libPlaylists">Playlists</button>
+        <button class="seg-btn" data-tab="libSongsPanel">Songs</button>
+        <button class="seg-btn" data-tab="libArtists">Artists</button>
+        <button class="seg-btn" data-tab="libAlbums">Albums</button>
+        <button class="seg-btn" data-tab="libDownloaded">Downloaded</button>
       </div>
-      <div class="sec-header"><h2>Songs</h2><span id="song-count" style="color:var(--text2);font-size:14px"></span></div>
-      <ul id="lib-songs" class="songs"></ul>
-    </div>
-
-    <!-- Browse -->
-    <div class="page" id="pg-browse">
-      <div class="hdr"><h1>Browse</h1></div>
-      <div id="browse-content" class="empty">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-        Download songs from Search to build your library
+      <div class="seg-content">
+        <div id="libPlaylists" class="sub-panel active">
+          <div id="libPlaylistsGrid" class="card-grid"></div>
+        </div>
+        <div id="libSongsPanel" class="sub-panel">
+          <div class="sort-bar">
+            <select id="sortSelect" class="sort-select"><option value="recent">Recent</option><option value="title">Title</option><option value="artist">Artist</option><option value="duration">Duration</option></select>
+            <select id="filterSelect" class="sort-select"><option value="">All</option><option value="downloaded">Downloaded</option><option value="liked">Liked</option></select>
+          </div>
+          <div id="libSongsList" class="song-list"></div>
+        </div>
+        <div id="libArtists" class="sub-panel">
+          <div id="libArtistsGrid" class="card-grid"></div>
+        </div>
+        <div id="libAlbums" class="sub-panel">
+          <div id="libAlbumsGrid" class="card-grid"></div>
+        </div>
+        <div id="libDownloaded" class="sub-panel">
+          <div id="libDownloadedList" class="song-list"></div>
+        </div>
       </div>
-    </div>
-  </div>
-
-  <!-- Mini Player -->
-  <div class="mini" id="mini">
-    <div class="mart"><img id="m-art" src="" alt=""></div>
-    <div class="mini-info" id="mini-tap">
-      <div class="mini-title" id="m-title">Not Playing</div>
-      <div class="mini-artist" id="m-artist"></div>
-    </div>
-    <div class="mini-btns">
-      <button id="m-prev"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 18,12 6,20"/><rect x="3" y="4" width="2.5" height="16" fill="currentColor"/></svg></button>
-      <button id="m-play"><svg viewBox="0 0 24 24"><polygon points="7,3 21,12 7,21"/></svg></button>
-      <button id="m-next"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="18,4 6,12 18,20"/><rect x="18.5" y="4" width="2.5" height="16" fill="currentColor"/></svg></button>
-    </div>
-  </div>
-
-  <!-- Full Player -->
-  <div class="fplayer" id="fp">
-    <div class="fp-top">
-      <button id="fp-down">▼</button>
-      <span class="label">Now Playing</span>
-      <button id="fp-more">•••</button>
-    </div>
-    <div class="fp-cover"><img id="fp-art" src="" alt=""></div>
-    <div class="fp-meta">
-      <div class="title" id="fp-title">—</div>
-      <div class="artist" id="fp-artist">—</div>
-    </div>
-    <div class="fp-prog">
-      <div class="track" id="prog-track"><div class="fill" id="prog-fill"></div><div class="knob" id="prog-knob"></div></div>
-      <div class="times"><span id="t-cur">0:00</span><span id="t-tot">-:--</span></div>
-    </div>
-    <div class="fp-ctrls">
-      <button class="side" id="fp-shuf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>
-      <button class="skip" id="fp-prev"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="3" height="16"/></svg></button>
-      <button class="main" id="fp-play"><svg viewBox="0 0 24 24"><polygon points="7,3 21,12 7,21"/></svg></button>
-      <button class="skip" id="fp-next"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="16" y="4" width="3" height="16"/></svg></button>
-      <button class="side" id="fp-rep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
-    </div>
-    <div class="fp-bottom">
-      <button id="fp-speaker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></button>
-      <button id="fp-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
-    </div>
-  </div>
-
-  <!-- Settings Modal -->
-  <div class="modal-bg" id="modal-settings">
-    <div class="modal">
-      <h3>Settings</h3>
-      <label>Server URL</label>
-      <input id="server-url" type="url" placeholder="http://192.168.1.x:3000">
-      <button class="save-btn" id="save-settings">Save</button>
-      <button class="close-modal" id="close-settings">Cancel</button>
-    </div>
-  </div>
-
-  <!-- Download overlay -->
-  <div class="dl-overlay" id="dl-overlay">
-    <div class="dl-card">
-      <div class="dl-spinner"></div>
-      <div class="dl-title" id="dl-title">Downloading...</div>
-      <div class="dl-sub" id="dl-sub">Converting from YouTube</div>
-    </div>
-  </div>
-
-  <!-- Tab Bar -->
-  <div class="tab-bar">
-    <div class="tab" data-pg="pg-search">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-      <span>Search</span>
-    </div>
-    <div class="tab active" data-pg="pg-library">
-      <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-      <span>Library</span>
-    </div>
-    <div class="tab" data-pg="pg-browse">
-      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      <span>Browse</span>
     </div>
   </div>
 </div>
 
-<script>
-// ========== NATIVE BRIDGE ==========
-let CapFS, CapPrefs;
-try { CapFS = window.Capacitor?.Plugins?.Filesystem; } catch(e) {}
-try { CapPrefs = window.Capacitor?.Plugins?.Preferences; } catch(e) {}
-
-const isCapacitor = !!window.Capacitor?.isNativePlatform?.();
-
-// ========== CONFIG ==========
-let SERVER = localStorage.getItem('server_url') || '';
-if (!SERVER) {
-  // Try to auto-detect or prompt
-  SERVER = '';
-}
-
-// ========== STATE ==========
-const DB_KEY = 'music_lib';
-let library = []; // {id, title, artist, coverUrl, duration, filename, dateAdded}
-let queue = [];
-let qi = -1;
-let current = null;
-let playing = false;
-let shuffle = false;
-let repeat = 0;
-const audio = new Audio();
-let progTimer;
-
-function saveLib() { localStorage.setItem(DB_KEY, JSON.stringify(library)); }
-function loadLib() { try { library = JSON.parse(localStorage.getItem(DB_KEY) || '[]'); } catch(e) { library = []; } }
-loadLib();
-
-// ========== HELPERS ==========
-const $ = s => document.querySelector(s);
-const $$ = s => document.querySelectorAll(s);
-const fmt = s => { if(!s||isNaN(s))return'0:00'; const m=Math.floor(s/60),sc=Math.floor(s%60); return m+':'+(sc<10?'0':'')+sc; };
-const esc = s => (s||'').replace(/&/g,'&').replace(/"/g,'"').replace(/</g,'<');
-
-// ========== NAVIGATION ==========
-$$('.tab').forEach(t => t.addEventListener('click', () => {
-  $$('.tab').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
-  $$('.page').forEach(p => p.classList.remove('active'));
-  $(`#${t.dataset.pg}`).classList.add('active');
-  if (t.dataset.pg === 'pg-library') renderLib();
-}));
-
-// ========== SETTINGS ==========
-$('#settings-btn').addEventListener('click', () => {
-  $('#server-url').value = SERVER;
-  $('#modal-settings').classList.add('open');
-});
-$('#close-settings').addEventListener('click', () => $('#modal-settings').classList.remove('open'));
-$('#save-settings').addEventListener('click', () => {
-  SERVER = $('#server-url').value.replace(/\/+$/, '');
-  localStorage.setItem('server_url', SERVER);
-  $('#modal-settings').classList.remove('open');
-  renderLib();
-});
-// Auto-open settings if no server configured
-if (!SERVER) setTimeout(() => $('#settings-btn').click(), 500);
-
-// ========== SEARCH ==========
-let searchTimer;
-$('#q').addEventListener('input', e => {
-  clearTimeout(searchTimer);
-  const val = e.target.value.trim();
-  if (!val) { $('#results').innerHTML = ''; return; }
-  searchTimer = setTimeout(() => doSearch(val), 350);
-});
-
-async function doSearch(q) {
-  if (!SERVER) { $('#settings-btn').click(); return; }
-  const r = $('#results');
-  r.innerHTML = '<div class="loading-wrap"><div class="spinner-sm" style="width:28px;height:28px;border-width:3px"></div></div>';
-  try {
-    const res = await fetch(`${SERVER}/api/search?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    if (!data.results?.length) { r.innerHTML = '<div class="empty">No results</div>'; return; }
-    r.innerHTML = '<ul class="songs">' + data.results.map(s => {
-      const downloaded = library.find(l => l.id === s.id);
-      return `<li class="srow" data-id="${s.id}" data-title="${esc(s.title)}" data-artist="${esc(s.channel||'')}" data-thumb="${s.thumbnail||''}" data-dur="${s.duration||0}">
-        <div class="art">${s.thumbnail ? `<img src="${s.thumbnail}" loading="lazy">` : '<span class="note">♪</span>'}</div>
-        <div class="srow-body"><div class="srow-title">${esc(s.title)}</div><div class="srow-sub">${esc(s.channel||'')} • ${s.duration||''}</div></div>
-        <div class="srow-btns">
-          ${downloaded ? '<button class="dl-btn downloaded" title="In Library"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></button>' :
-          '<button class="dl-btn" title="Download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>'}
-        </div>
-      </li>`;
-    }).join('') + '</ul>';
-    bindSearchClicks();
-  } catch(e) { r.innerHTML = '<div class="empty">Search failed — check server URL in Settings</div>'; }
-}
-
-function bindSearchClicks() {
-  $$('#results .srow').forEach(row => {
-    const btn = row.querySelector('.dl-btn');
-    btn?.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (btn.classList.contains('downloaded')) return;
-      await downloadSong(row.dataset.id, row.dataset.title, row.dataset.artist, row.dataset.thumb, parseInt(row.dataset.dur));
-    });
-    row.addEventListener('click', () => {
-      // If downloaded, play it
-      const found = library.find(l => l.id === row.dataset.id);
-      if (found) { playFromLib(found); }
-    });
-  });
-}
-
-// ========== DOWNLOAD ==========
-async function downloadSong(videoId, title, artist, thumb, duration) {
-  if (!SERVER) { $('#settings-btn').click(); return; }
-
-  // Show download overlay
-  $('#dl-title').textContent = title;
-  $('#dl-sub').textContent = 'Sending to server...';
-  $('#dl-overlay').classList.add('show');
-
-  try {
-    // Step 1: Tell server to download & convert
-    $('#dl-sub').textContent = 'Downloading from YouTube...';
-    const res = await fetch(`${SERVER}/api/music/add`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: `https://www.youtube.com/watch?v=${videoId}` })
-    });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Download failed');
-
-    const songData = data.song;
-    const streamUrl = `${SERVER}/api/music/stream/${encodeURIComponent(songData.playlist)}/${encodeURIComponent(songData.file)}`;
-    const coverUrl = songData.coverUrl ? `${SERVER}${songData.coverUrl}` : '';
-
-    // Step 2: Download the MP3 file to device
-    $('#dl-sub').textContent = 'Saving to device...';
-    let localUri;
-
-    if (isCapacitor && CapFS) {
-      // Use Capacitor Filesystem to save locally
-      const response = await fetch(streamUrl);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const base64 = await new Promise((resolve) => {
-        reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        reader.readAsDataURL(blob);
-      });
-
-      const filename = `${videoId}.mp3`;
-      const dirResult = await CapFS.getUri({ path: '', directory: 'DOCUMENTS' });
-      
-      await CapFS.writeFile({
-        path: `MyMusic/${filename}`,
-        data: base64,
-        directory: 'DOCUMENTS',
-        recursive: true
-      });
-
-      const fileUri = await CapFS.getUri({ path: `MyMusic/${filename}`, directory: 'DOCUMENTS' });
-      localUri = fileUri.uri;
-    }
-
-    // Step 3: Save to library
-    const entry = {
-      id: videoId,
-      title: songData.title || title,
-      artist: songData.artist || artist,
-      coverUrl: coverUrl,
-      duration: songData.duration || duration,
-      filename: isCapacitor ? localUri : streamUrl,
-      playlist: songData.playlist,
-      file: songData.file,
-      dateAdded: Date.now(),
-      local: isCapacitor
-    };
-
-    library.push(entry);
-    saveLib();
-
-    $('#dl-overlay').classList.remove('show');
-    renderLib();
-
-    // Refresh search results to show downloaded status
-    const q = $('#q').value.trim();
-    if (q) doSearch(q);
-
-  } catch(e) {
-    console.error('Download error:', e);
-    $('#dl-overlay').classList.remove('show');
-    alert('Download failed: ' + e.message);
-  }
-}
-
-// ========== LIBRARY ==========
-function renderLib() {
-  const container = $('#lib-songs');
-  if (!library.length) {
-    container.innerHTML = '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Your library is empty<br>Search and download songs!</div>';
-    $('#song-count').textContent = '';
-    $('#artists-sec').style.display = 'none';
-    return;
-  }
-
-  $('#song-count').textContent = `${library.length} song${library.length !== 1 ? 's' : ''}`;
-
-  // Sort by date added (newest first)
-  const sorted = [...library].sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0));
-  container.innerHTML = sorted.map(s => songRowHTML(s, true)).join('');
-
-  // Artists
-  const artists = {};
-  library.forEach(s => {
-    const a = s.artist || 'Unknown';
-    if (!artists[a]) artists[a] = { name: a, songs: [], cover: s.coverUrl };
-    artists[a].songs.push(s);
-    if (!artists[a].cover && s.coverUrl) artists[a].cover = s.coverUrl;
-  });
-  const artistList = Object.values(artists).sort((a, b) => b.songs.length - a.songs.length);
-  if (artistList.length > 1) {
-    $('#artists-sec').style.display = '';
-    $('#artists-row').innerHTML = artistList.slice(0, 15).map(a => `
-      <div class="artist-card">
-        <div class="avatar">${a.cover ? `<img src="${a.cover}" loading="lazy">` : ''}</div>
-        <div class="name">${esc(a.name)}</div>
-        <div class="count">${a.songs.length} song${a.songs.length!==1?'s':''}</div>
-      </div>`).join('');
-  } else {
-    $('#artists-sec').style.display = 'none';
-  }
-
-  bindLibClicks();
-}
-
-function songRowHTML(s, showDel) {
-  const isPlaying = current?.id === s.id;
-  return `<li class="srow${isPlaying?' playing':''}" data-id="${s.id}">
-    <div class="art">${s.coverUrl ? `<img src="${s.coverUrl}" loading="lazy">` : '<span class="note">♪</span>'}</div>
-    <div class="srow-body">
-      <div class="srow-title">${isPlaying ? '<span class="eq-bars"><span></span><span></span><span></span></span> ' : ''}${esc(s.title)}</div>
-      <div class="srow-sub">${esc(s.artist||'Unknown')}</div>
+<!-- SEARCH -->
+<div id="pageSearch" class="page">
+  <div class="scroll-content">
+    <div class="page-header"><h1 class="page-title">Search</h1></div>
+    <div class="search-bar">
+      <div class="search-input-wrap">
+        <svg class="icon-sm search-icon"><use href="#icon-tab-search"/></svg>
+        <input type="search" id="searchPageInput" placeholder="Songs, artists, albums..." oninput="onSearchInput(this)" autocomplete="off">
+        <button class="search-clear" onclick="clearSearch()" aria-label="Clear"><svg class="icon-xs"><use href="#icon-x"/></svg></button>
+      </div>
     </div>
-    <div class="srow-btns">
-      ${showDel ? `<button class="del-btn" data-id="${s.id}" title="Delete"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>` : ''}
+    <div id="searchPageResults" class="search-results"></div>
+  </div>
+</div>
+
+<!-- PLAYLIST VIEW -->
+<div id="playlistView" class="page">
+  <div class="scroll-content">
+    <div class="playlist-nav">
+      <button class="icon-btn" onclick="closePlaylistView()" aria-label="Back"><svg class="icon-md"><use href="#icon-chevron-left"/></svg></button>
+      <button class="icon-btn" onclick="showQueueSheet()" aria-label="Queue"><svg class="icon-md"><use href="#icon-list"/></svg></button>
     </div>
-  </li>`;
-}
+    <div class="playlist-hero">
+      <div class="art"><img id="pvArt" src="" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:16px"></div>
+      <div class="playlist-hero-info">
+        <h1 id="pvTitle">Playlist</h1>
+        <p id="pvName"></p>
+        <p id="pvCount"></p>
+      </div>
+    </div>
+    <div class="playlist-actions">
+      <button class="action-btn primary" onclick="playAllPlaylist()"><svg class="icon-sm"><use href="#icon-play"/></svg> Play All</button>
+      <button class="action-btn" onclick="shufflePlayAll()"><svg class="icon-sm"><use href="#icon-shuffle"/></svg> Shuffle</button>
+    </div>
+    <div id="pvSongs" class="song-list"></div>
+  </div>
+</div>
 
-function bindLibClicks() {
-  $$('#lib-songs .srow').forEach(row => {
-    row.addEventListener('click', e => {
-      if (e.target.closest('.del-btn')) return;
-      const song = library.find(s => s.id === row.dataset.id);
-      if (song) playFromLib(song);
-    });
-  });
-  $$('#lib-songs .del-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const song = library.find(s => s.id === id);
-      if (song && song.local && CapFS) {
-        try { await CapFS.deleteFile({ path: `MyMusic/${id}.mp3`, directory: 'DOCUMENTS' }); } catch(e) {}
-      }
-      library = library.filter(s => s.id !== id);
-      saveLib();
-      if (current?.id === id) { audio.pause(); current = null; $('#mini').classList.remove('show'); }
-      renderLib();
-    });
-  });
-}
+<!-- ===== MINI PLAYER ===== -->
+<div id="miniPlayer" class="mini-player" style="display:none">
+  <div class="mini-progress" id="miniProgress"></div>
+  <div class="mini-content" onclick="openFullPlayer()">
+    <div class="mini-art"><img id="miniArt" src="" alt="" onerror="this.style.display='none'"></div>
+    <div class="mini-info">
+      <div class="mini-title" id="miniTitle">Not Playing</div>
+      <div class="mini-artist" id="miniArtist"></div>
+    </div>
+    <button class="icon-btn mini-play-btn" onclick="event.stopPropagation();togglePlay()" aria-label="Play/Pause">
+      <svg class="icon-lg" id="miniPlayIcon"><use href="#icon-play"/></svg>
+    </button>
+    <button class="icon-btn" onclick="event.stopPropagation();playNext()" aria-label="Next">
+      <svg class="icon-md"><use href="#icon-skip-forward"/></svg>
+    </button>
+  </div>
+</div>
 
-// ========== PLAYER ==========
-function playFromLib(song) {
-  // Build queue from all library songs
-  queue = [...library].sort((a, b) => (a.artist||'').localeCompare(b.artist||''));
-  qi = queue.findIndex(s => s.id === song.id);
-  if (qi === -1) { queue = [song]; qi = 0; }
-  play(song);
-}
+<!-- ===== FULL PLAYER ===== -->
+<div id="fullPlayer" class="full-player">
+  <div class="fp-header">
+    <div class="fp-drag-handle"></div>
+    <button class="icon-btn" onclick="closeFullPlayer()" aria-label="Minimize"><svg class="icon-md"><use href="#icon-chevron-down"/></svg></button>
+    <div class="fp-header-title">Now Playing</div>
+    <button class="icon-btn" id="fpQueueBtn" aria-label="Queue"><svg class="icon-md"><use href="#icon-list"/></svg></button>
+  </div>
+  <div class="fp-art-wrap">
+    <img id="fpArt" class="fp-art" src="" alt="">
+  </div>
+  <div class="fp-info">
+    <div class="fp-title" id="fpTitle">Not Playing</div>
+    <button class="fp-artist-link" id="fpArtist" onclick="fpArtistTapped()"></button>
+    <div id="fpOfflineBadge" style="display:none;font-size:11px;color:var(--text3);margin-top:4px"><svg class="icon-xs"><use href="#icon-wifi-off"/></svg> Offline</div>
+  </div>
+  <div id="fpProgressBar" class="progress-bar">
+    <div class="progress-fill" id="fpProgressFill"></div>
+    <div class="progress-thumb" id="fpProgressThumb"></div>
+    <div class="seek-preview" id="fpSeekPreview"></div>
+  </div>
+  <div class="progress-times">
+    <span id="fpTimeCurrent">0:00</span>
+    <span id="fpTimeTotal">0:00</span>
+  </div>
+  <div class="fp-controls">
+    <button class="icon-btn" id="fpShuffleBtn" onclick="toggleShuffle()" aria-label="Shuffle"><svg class="icon-md"><use href="#icon-shuffle"/></svg></button>
+    <button class="icon-btn" onclick="playPrev()" aria-label="Previous"><svg class="icon-lg"><use href="#icon-skip-back"/></svg></button>
+    <button class="fp-play-btn" onclick="togglePlay()" aria-label="Play/Pause"><svg class="icon-xl" id="fpPlayIcon"><use href="#icon-play"/></svg></button>
+    <button class="icon-btn" onclick="playNext()" aria-label="Next"><svg class="icon-lg"><use href="#icon-skip-forward"/></svg></button>
+    <button class="icon-btn" id="fpRepeatBtn" onclick="toggleRepeat()" aria-label="Repeat"><svg class="icon-md"><use href="#icon-repeat"/></svg></button>
+  </div>
+  <div class="fp-extras">
+    <button class="icon-btn" id="fpVolumeBtn" onclick="toggleVolumeSlider()" aria-label="Volume"><svg class="icon-md"><use href="#icon-volume"/></svg></button>
+    <div class="volume-slider-wrap" id="volumeSliderWrap" style="display:none">
+      <input type="range" id="fpVolumeSlider" min="0" max="1" step="0.01" value="1">
+    </div>
+    <button class="icon-btn" id="fpLikeBtn" onclick="toggleCurrentLiked()" aria-label="Like"><svg class="icon-md" id="fpLikeIcon"><use href="#icon-heart"/></svg></button>
+    <button class="icon-btn" id="fpSpeedBtn" aria-label="Speed"><svg class="icon-sm"><use href="#icon-speed"/></svg><span id="fpSpeedLabel" class="speed-label">1x</span></button>
+    <button class="icon-btn" id="fpSleepBtn" aria-label="Sleep Timer"><svg class="icon-md"><use href="#icon-clock"/></svg></button>
+    <button class="icon-btn" onclick="showDownloadSheet()" aria-label="Download"><svg class="icon-md"><use href="#icon-download"/></svg></button>
+  </div>
+</div>
 
-function play(song) {
-  current = song;
-  audio.src = song.filename; // local URI (capacitor) or stream URL (web)
-  audio.play().catch(e => console.error('Play error:', e));
-  playing = true;
-  updateUI();
-  setupMediaSession();
+<!-- ===== TAB BAR ===== -->
+<div class="tab-bar" id="tabBar">
+  <button class="tab-item active" data-page="pageNowPlaying">
+    <svg class="tab-icon"><use href="#icon-tab-home"/></svg>
+    <span class="tab-label">Listen Now</span>
+  </button>
+  <button class="tab-item" data-page="pageBrowse">
+    <svg class="tab-icon"><use href="#icon-tab-browse"/></svg>
+    <span class="tab-label">Browse</span>
+  </button>
+  <button class="tab-item" data-page="pageLibrary">
+    <svg class="tab-icon"><use href="#icon-tab-library"/></svg>
+    <span class="tab-label">Library</span>
+  </button>
+  <button class="tab-item" data-page="pageSearch">
+    <svg class="tab-icon"><use href="#icon-tab-search"/></svg>
+    <span class="tab-label">Search</span>
+  </button>
+</div>
 
-  clearInterval(progTimer);
-  progTimer = setInterval(updateProgress, 250);
-}
+<!-- ===== SHEETS ===== -->
 
-function updateUI() {
-  if (!current) return;
-  // Mini player
-  $('#mini').classList.add('show');
-  $('#m-title').textContent = current.title;
-  $('#m-artist').textContent = current.artist || '';
-  if (current.coverUrl) $('#m-art').src = current.coverUrl;
+<!-- Download Sheet -->
+<div id="downloadOverlay" class="sheet-overlay" onclick="hideDownloadSheet()"></div>
+<div id="downloadSheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header"><h2>Download</h2><button class="icon-btn" onclick="hideDownloadSheet()"><svg class="icon-md"><use href="#icon-x"/></svg></button></div>
+  <div id="downloadContent" class="sheet-body"></div>
+</div>
 
-  // Full player
-  $('#fp-title').textContent = current.title;
-  $('#fp-artist').textContent = current.artist || '';
-  if (current.coverUrl) $('#fp-art').src = current.coverUrl;
+<!-- Queue Sheet -->
+<div id="queueOverlay" class="sheet-overlay" onclick="hideQueueSheet()"></div>
+<div id="queueSheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header"><h2>Up Next</h2><button class="icon-btn" onclick="hideQueueSheet()"><svg class="icon-md"><use href="#icon-x"/></svg></button></div>
+  <div id="queueContent" class="sheet-body"></div>
+</div>
 
-  updatePlayBtn();
-  renderLib(); // update playing indicator
-}
+<!-- Context Menu Sheet -->
+<div id="contextOverlay" class="sheet-overlay" onclick="hideContextMenu()"></div>
+<div id="contextSheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="ctx-header">
+    <img id="ctxArt" class="ctx-art" src="" alt="">
+    <div class="ctx-info"><div class="ctx-title" id="ctxTitle">Song</div><div class="ctx-artist" id="ctxArtist">Artist</div></div>
+  </div>
+  <div class="ctx-actions">
+    <button class="ctx-btn" id="ctxLikeBtn"><svg class="icon-ctx"><use href="#icon-heart"/></svg> Like</button>
+    <button class="ctx-btn" id="ctxDlBtn"><svg class="icon-ctx"><use href="#icon-download"/></svg> Download</button>
+    <button class="ctx-btn" id="ctxPlayNextBtn"><svg class="icon-ctx"><use href="#icon-skip-forward"/></svg> Play Next</button>
+    <button class="ctx-btn" id="ctxQueueBtn"><svg class="icon-ctx"><use href="#icon-list"/></svg> Add to Queue</button>
+    <button class="ctx-btn" id="ctxArtistBtn"><svg class="icon-ctx"><use href="#icon-tab-search"/></svg> Go to Artist</button>
+    <button class="ctx-btn" id="ctxAlbumBtn"><svg class="icon-ctx"><use href="#icon-tab-library"/></svg> Go to Album</button>
+    <button class="ctx-btn" id="ctxShareBtn"><svg class="icon-ctx"><use href="#icon-share"/></svg> Share</button>
+  </div>
+</div>
 
-function updatePlayBtn() {
-  const mainSvg = playing ?
-    '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>' :
-    '<svg viewBox="0 0 24 24"><polygon points="7,3 21,12 7,21"/></svg>';
+<!-- Settings Sheet -->
+<div id="settingsOverlay" class="sheet-overlay" onclick="hideSettings()"></div>
+<div id="settingsSheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header"><h2>Settings</h2><button class="icon-btn" onclick="hideSettings()"><svg class="icon-md"><use href="#icon-x"/></svg></button></div>
+  <div class="sheet-body">
+    <div class="setting-group">
+      <label class="setting-label">Server URL</label>
+      <input type="url" id="settingsServerUrl" class="setting-input" placeholder="http://...">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label">Theme</label>
+      <div class="theme-btns">
+        <button class="theme-btn" id="themeDark" onclick="setTheme('dark')"><svg class="icon-sm"><use href="#icon-moon"/></svg> Dark</button>
+        <button class="theme-btn" id="themeLight" onclick="setTheme('light')"><svg class="icon-sm"><use href="#icon-sun"/></svg> Light</button>
+      </div>
+    </div>
+    <button class="action-btn primary" onclick="saveSettings()">Save & Reconnect</button>
+  </div>
+</div>
 
-  $('#fp-play').innerHTML = mainSvg;
-  $('#m-play').innerHTML = playing ?
-    '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>' :
-    '<svg viewBox="0 0 24 24"><polygon points="7,3 21,12 7,21"/></svg>';
-}
+<!-- Sleep Timer Sheet -->
+<div id="sleepTimerOverlay" class="sheet-overlay" onclick="hideSheet('sleepTimer')"></div>
+<div id="sleepTimerSheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header"><h2>Sleep Timer</h2><button class="icon-btn" onclick="hideSheet('sleepTimer')"><svg class="icon-md"><use href="#icon-x"/></svg></button></div>
+  <div class="sheet-body">
+    <div class="sleep-options">
+      <button class="ctx-btn" onclick="setSleepTimer(5)">5 minutes</button>
+      <button class="ctx-btn" onclick="setSleepTimer(15)">15 minutes</button>
+      <button class="ctx-btn" onclick="setSleepTimer(30)">30 minutes</button>
+      <button class="ctx-btn" onclick="setSleepTimer(45)">45 minutes</button>
+      <button class="ctx-btn" onclick="setSleepTimer(60)">60 minutes</button>
+      <button class="ctx-btn" onclick="setSleepTimer(0)">Cancel Timer</button>
+    </div>
+  </div>
+</div>
 
-function updateProgress() {
-  if (!audio.duration) return;
-  const pct = (audio.currentTime / audio.duration) * 100;
-  $('#prog-fill').style.width = pct + '%';
-  $('#prog-knob').style.left = pct + '%';
-  $('#t-cur').textContent = fmt(audio.currentTime);
-  $('#t-tot').textContent = fmt(audio.duration);
-}
+<!-- Toast Container -->
+<div id="toastContainer"></div>
 
-function setupMediaSession() {
-  if (!('mediaSession' in navigator)) return;
-  navigator.mediaSession.metadata = new MediaMetadata({
-    title: current.title, artist: current.artist || '',
-    artwork: current.coverUrl ? [{ src: current.coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
-  });
-  navigator.mediaSession.setActionHandler('play', () => { audio.play(); playing = true; updatePlayBtn(); });
-  navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); playing = false; updatePlayBtn(); });
-  navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
-  navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
-}
+<!-- ===== SCRIPTS ===== -->
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/state.js"></script>
+<script src="js/api.js"></script>
+<script src="js/offline.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/player.js"></script>
+<script src="js/search.js"></script>
+<script src="js/library.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/browse.js"></script>
+<script src="js/app.js"></script>
+<script src="js/gestures.js"></script>
 
-function nextTrack() {
-  if (!queue.length) return;
-  if (repeat === 2) { audio.currentTime = 0; audio.play(); return; }
-  let n = qi + 1;
-  if (shuffle) n = Math.floor(Math.random() * queue.length);
-  if (n >= queue.length) n = repeat === 1 ? 0 : -1;
-  if (n === -1) return;
-  qi = n;
-  play(queue[n]);
-}
-
-function prevTrack() {
-  if (!queue.length) return;
-  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
-  let p = qi - 1;
-  if (p < 0) p = queue.length - 1;
-  qi = p;
-  play(queue[p]);
-}
-
-// Audio events
-audio.addEventListener('ended', nextTrack);
-audio.addEventListener('pause', () => { playing = false; updatePlayBtn(); });
-audio.addEventListener('play', () => { playing = true; updatePlayBtn(); });
-
-// Controls
-$('#m-play').addEventListener('click', () => playing ? audio.pause() : audio.play());
-$('#fp-play').addEventListener('click', () => playing ? audio.pause() : audio.play());
-$('#m-next').addEventListener('click', nextTrack);
-$('#m-prev').addEventListener('click', prevTrack);
-$('#fp-next').addEventListener('click', nextTrack);
-$('#fp-prev').addEventListener('click', prevTrack);
-$('#fp-shuf').addEventListener('click', () => { shuffle = !shuffle; $('#fp-shuf').classList.toggle('on', shuffle); });
-$('#fp-rep').addEventListener('click', () => { repeat = (repeat + 1) % 3; $('#fp-rep').classList.toggle('on', repeat > 0); });
-
-// Full player open/close
-$('#mini-tap').addEventListener('click', () => $('#fp').classList.add('open'));
-$('#fp-down').addEventListener('click', () => $('#fp').classList.remove('open'));
-
-// Progress seek
-$('#prog-track').addEventListener('click', e => {
-  if (!audio.duration) return;
-  const rect = e.currentTarget.getBoundingClientRect();
-  audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
-});
-
-// ========== INIT ==========
-renderLib();
-</script>
 </body>
 </html>

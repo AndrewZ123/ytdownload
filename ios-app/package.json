@@ -6,7 +6,8 @@
     "build": "echo 'No build step needed'",
     "cap:add": "npx cap add ios",
     "cap:open": "npx cap open ios",
-    "cap:sync": "npx cap sync"
+    "cap:sync": "npx cap sync",
+    "postinstall": "node fix-cordova-headers.js"
   },
   "dependencies": {
     "@capacitor/ios": "^6.0.0",

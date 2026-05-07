@@ -2,429 +2,790 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YT Music Downloader</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Music</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);min-height:100vh;color:#fff;display:flex;flex-direction:column;align-items:center}
-.container{max-width:780px;width:100%;padding:30px 16px}
-h1{text-align:center;font-size:1.8rem;margin-bottom:4px}
-.subtitle{text-align:center;color:#a5a3c9;margin-bottom:20px;font-size:.9rem}
-.tab-nav{display:flex;gap:0;margin-bottom:24px;background:rgba(255,255,255,.05);border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.1);flex-wrap:wrap}
-.tab-btn{flex:1;min-width:90px;padding:12px 10px;background:transparent;color:#a5a3c9;font-size:.8rem;font-weight:600;cursor:pointer;border:none;transition:all .2s;text-align:center;white-space:nowrap}
-.tab-btn:hover{background:rgba(255,255,255,.05);color:#fff}
-.tab-btn.active{background:rgba(124,109,255,.2);color:#fff}
-.tab-content{display:none}.tab-content.active{display:block}
-.input-group{display:flex;gap:10px;margin-bottom:20px}
-input[type="text"],input[type="url"]{flex:1;padding:12px 16px;border:2px solid #4a4772;border-radius:12px;background:rgba(255,255,255,.08);color:#fff;font-size:.95rem;outline:none;transition:border-color .2s}
-input::placeholder{color:#7a78a0}input:focus{border-color:#7c6dff}
-textarea{width:100%;padding:12px 16px;border:2px solid #4a4772;border-radius:12px;background:rgba(255,255,255,.08);color:#fff;font-size:.9rem;outline:none;resize:vertical;min-height:80px;font-family:inherit}
-textarea:focus{border-color:#7c6dff}
-select{padding:12px 16px;border:2px solid #4a4772;border-radius:12px;background:rgba(255,255,255,.08);color:#fff;font-size:.95rem;outline:none}
-button{padding:12px 24px;border:none;border-radius:12px;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .2s}
-.btn-primary{background:linear-gradient(135deg,#7c6dff,#a78bfa);color:#fff}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(124,109,255,.4)}
-.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
-.btn-secondary{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2)}
-.btn-secondary:hover{background:rgba(255,255,255,.15)}
-.btn-green{background:linear-gradient(135deg,#34d399,#10b981);color:#fff}
-.btn-green:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(52,211,153,.4)}
-.btn-green:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
-.btn-red{background:linear-gradient(135deg,#f87171,#ef4444);color:#fff}
-.btn-red:hover{transform:translateY(-1px)}
-.btn-sm{padding:8px 16px;font-size:.8rem}
-.card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px;margin-bottom:16px}
-.card-title{font-size:1rem;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.track-list{list-style:none;max-height:280px;overflow-y:auto}
-.track-list li{padding:6px 10px;border-radius:6px;display:flex;align-items:center;gap:8px;font-size:.85rem;color:#c4c2e0}
-.track-list li:hover{background:rgba(255,255,255,.05)}
-.track-num{color:#7c6dff;font-weight:600;min-width:24px}
-.status-section{display:none}.status-section.visible{display:block}
-.progress-bar-container{width:100%;height:6px;background:rgba(255,255,255,.1);border-radius:3px;margin:12px 0;overflow:hidden}
-.progress-bar{height:100%;background:linear-gradient(90deg,#7c6dff,#a78bfa);border-radius:3px;transition:width .3s ease;width:0%}
-.progress-bar.green{background:linear-gradient(90deg,#34d399,#10b981)}
-.download-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
-.download-item:last-child{border-bottom:none}
-.status-icon{font-size:1rem}
-.status-done{color:#34d399}.status-error{color:#f87171}
-.download-title{flex:1;font-size:.85rem}
-.summary{text-align:center;padding:14px;font-size:.95rem}
-.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#7c6dff;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:middle}
-@keyframes spin{to{transform:rotate(360deg)}}
+:root{
+  --accent:#fc3c44;--accent2:#ff2d55;
+  --bg:#000;--bg2:#1c1c1e;--bg3:#2c2c2e;--bg4:#3a3a3c;
+  --text:#fff;--text2:#8e8e93;--text3:#636366;
+  --card:#1c1c1e;--card-hover:#2c2c2e;
+  --border:rgba(255,255,255,.08);
+  --shadow:0 2px 20px rgba(0,0,0,.4);
+  --safe-b:env(safe-area-inset-bottom,0px)
+}
+[data-theme="light"]{
+  --bg:#f2f2f7;--bg2:#fff;--bg3:#f2f2f7;--bg4:#e5e5ea;
+  --text:#000;--text2:#8e8e93;--text3:#aeaeb2;
+  --card:#fff;--card-hover:#f2f2f7;
+  --border:rgba(0,0,0,.08);
+  --shadow:0 2px 20px rgba(0,0,0,.08)
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',sans-serif}
+a{color:var(--accent);text-decoration:none}
+input,textarea,select,button{font-family:inherit}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
+
+/* ═══ APP SHELL ═══ */
+#app{display:flex;flex-direction:column;height:100%;position:relative}
+.app-header{padding:12px 16px 8px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.app-header h1{font-size:1.4rem;font-weight:700;letter-spacing:-.02em}
+.theme-toggle{background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer;padding:6px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.theme-toggle:hover{background:var(--bg3)}
+
+/* ═══ MAIN SCROLL AREA ═══ */
+.main-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(70px + var(--safe-b))}
+
+/* ═══ BOTTOM TAB BAR ═══ */
+.tab-bar{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--bg2);border-top:1px solid var(--border);padding-bottom:var(--safe-b);z-index:100}
+.tab-bar-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 0 4px;cursor:pointer;border:none;background:none;color:var(--text3);font-size:.6rem;font-weight:500;gap:2px;transition:color .15s}
+.tab-bar-item.active{color:var(--accent)}
+.tab-bar-item svg{width:22px;height:22px;fill:currentColor}
+.tab-bar-item span{pointer-events:none}
+
+/* ═══ MINI PLAYER ═══ */
+.mini-player{position:fixed;bottom:calc(56px + var(--safe-b));left:8px;right:8px;height:56px;background:var(--bg3);border-radius:14px;display:none;align-items:center;gap:10px;padding:0 12px;z-index:99;cursor:pointer;box-shadow:var(--shadow);overflow:hidden}
+.mini-player.visible{display:flex}
+.mini-player-art{width:40px;height:40px;border-radius:8;object-fit:cover;background:var(--bg4);flex-shrink:0}
+.mini-player-info{flex:1;min-width:0}
+.mini-player-title{font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-player-artist{font-size:.7rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-player-progress{position:absolute;bottom:0;left:0;height:2px;background:var(--accent);transition:width .3s linear;border-radius:1px}
+.mini-player-controls{display:flex;gap:4px;align-items:center;flex-shrink:0}
+.mini-player-controls button{background:none;border:none;color:var(--text);cursor:pointer;padding:4px;display:flex;align-items:center}
+.mini-player-controls button svg{width:22px;height:22px;fill:currentColor}
+
+/* ═══ FULL SCREEN PLAYER ═══ */
+.full-player{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column;transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1)}
+.full-player.open{display:flex;transform:translateY(0)}
+.full-player-header{display:flex;align-items:center;justify-content:space-between;padding:16px;flex-shrink:0}
+.full-player-header button{background:none;border:none;color:var(--text2);font-size:.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px}
+.full-player-header span{font-size:.75rem;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.full-player-artwork{flex:1;display:flex;align-items:center;justify-content:center;padding:20px 36px}
+.full-player-artwork img{width:100%;max-width:360px;aspect-ratio:1;border-radius:12px;object-fit:cover;background:var(--bg3);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.full-player-info{text-align:center;padding:0 30px 16px}
+.full-player-title{font-size:1.15rem;font-weight:700;margin-bottom:2px}
+.full-player-artist{font-size:.9rem;color:var(--accent)}
+.full-player-progress{padding:0 30px;flex-shrink:0}
+.full-player-bar{width:100%;height:4px;background:var(--bg4);border-radius:2px;cursor:pointer;position:relative}
+.full-player-bar-fill{height:100%;background:var(--text);border-radius:2px;transition:width .2s linear;position:relative}
+.full-player-bar-fill::after{content:'';position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--text);opacity:0;transition:opacity .15s}
+.full-player-bar:hover .full-player-bar-fill::after{opacity:1}
+.full-player-times{display:flex;justify-content:space-between;font-size:.7rem;color:var(--text2);margin-top:4px}
+.full-player-controls{display:flex;align-items:center;justify-content:center;gap:28px;padding:16px 30px;flex-shrink:0}
+.full-player-controls button{background:none;border:none;color:var(--text);cursor:pointer;display:flex;align-items:center;padding:4px}
+.full-player-controls .play-btn svg{width:52px;height:52px;fill:var(--text)}
+.full-player-controls .skip-btn svg{width:32px;height:32px;fill:var(--text)}
+.full-player-controls .shuffle-btn svg,.full-player-controls .repeat-btn svg{width:20px;height:20px;fill:var(--text2)}
+.full-player-controls .active-toggle{color:var(--accent)}
+.full-player-controls .active-toggle svg{fill:var(--accent)}
+.full-player-volume{display:flex;align-items:center;gap:10px;padding:4px 40px 16px;flex-shrink:0}
+.full-player-volume svg{width:16px;height:16px;fill:var(--text2);flex-shrink:0}
+.full-player-volume input[type=range]{flex:1;-webkit-appearance:none;height:4px;background:var(--bg4);border-radius:2px;outline:none}
+.full-player-volume input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--text);cursor:pointer}
+.full-player-bottom{display:flex;align-items:center;justify-content:space-around;padding:8px 30px calc(10px + var(--safe-b));flex-shrink:0}
+.full-player-bottom button{background:none;border:none;color:var(--text2);cursor:pointer;display:flex;align-items:center}
+.full-player-bottom button svg{width:20px;height:20px;fill:currentColor}
+
+/* ═══ PAGE STYLES ═══ */
+.page{display:none;padding:0 16px 16px}
+.page.active{display:block}
+.section-title{font-size:1.3rem;font-weight:700;margin:16px 0 12px;letter-spacing:-.02em}
+.section-subtitle{font-size:.82rem;color:var(--text2);margin-bottom:12px}
+
+/* ═══ CARDS ═══ */
+.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:12px}
+.card-title{font-size:.95rem;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.card-row:last-child{border-bottom:none}
+.card-row:active{background:var(--card-hover)}
+
+/* ═══ SONG ROW ═══ */
+.song-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);transition:background .1s;position:relative}
+.song-row:last-child{border-bottom:none}
+.song-row:active{background:var(--card-hover)}
+.song-row-art{width:44px;height:44px;border-radius:6px;object-fit:cover;background:var(--bg4);flex-shrink:0}
+.song-row-art.placeholder{background:linear-gradient(135deg,var(--bg4),var(--bg3))}
+.song-row-info{flex:1;min-width:0}
+.song-row-title{font-size:.88rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.song-row-artist{font-size:.75rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.song-row-duration{font-size:.72rem;color:var(--text3);flex-shrink:0}
+.song-row-actions{display:flex;gap:2px;flex-shrink:0;align-items:center}
+.icon-btn{background:none;border:none;color:var(--text2);cursor:pointer;padding:6px;display:flex;align-items:center;border-radius:50%}
+.icon-btn:hover{background:var(--bg3)}
+.icon-btn svg{width:18px;height:18px;fill:currentColor}
+
+/* ═══ ALBUM GRID ═══ */
+.album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-bottom:16px}
+.album-card{cursor:pointer;transition:transform .15s}
+.album-card:active{transform:scale(.97)}
+.album-card img{width:100%;aspect-ratio:1;border-radius:10px;object-fit:cover;background:var(--bg4);margin-bottom:6px}
+.album-card-title{font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.album-card-sub{font-size:.72rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ═══ INPUTS ═══ */
+.input-row{display:flex;gap:8px;margin-bottom:12px}
+.input-field{flex:1;padding:10px 14px;border:none;border-radius:10px;background:var(--bg3);color:var(--text);font-size:.9rem;outline:none}
+.input-field::placeholder{color:var(--text3)}
+.input-field:focus{box-shadow:0 0 0 2px var(--accent)}
+textarea.input-field{min-height:70px;resize:vertical;border-radius:10px}
+select.input-field{flex:none;min-width:80px}
+.btn{padding:10px 18px;border:none;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-accent:hover{filter:brightness(1.1)}
+.btn-accent:disabled{opacity:.5;cursor:not-allowed}
+.btn-green{background:#34c759;color:#fff}
+.btn-green:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{background:var(--bg3);color:var(--text)}
+.btn-secondary:hover{background:var(--bg4)}
+.btn-sm{padding:7px 12px;font-size:.78rem}
+.btn-red{background:#ff3b30;color:#fff}
+
+/* ═══ PROGRESS ═══ */
+.progress-bar{width:100%;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s ease;width:0%}
+.progress-fill.green{background:#34c759}
+.status-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.82rem}
+.status-icon.done{color:#34c759}
+.status-icon.error{color:#ff3b30}
+
+/* ═══ BADGES & CHIPS ═══ */
+.badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:.65rem;font-weight:600}
+.badge-green{background:rgba(52,199,89,.15);color:#34c759}
+.badge-yellow{background:rgba(255,204,0,.15);color:#ffcc00}
+.badge-red{background:rgba(255,59,48,.15);color:#ff3b30}
+.badge-blue{background:rgba(0,122,255,.15);color:#007aff}
+.chip{display:inline-block;padding:7px 14px;background:var(--bg3);border-radius:18px;font-size:.8rem;cursor:pointer;margin:3px;transition:all .15s}
+.chip:hover,.chip.active{background:var(--accent);color:#fff}
+
+/* ═══ PLAYLIST ITEM ═══ */
+.playlist-item{display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border-radius:12px;margin-bottom:8px}
+.playlist-item-info{flex:1;min-width:0}
+.playlist-item-name{font-size:.9rem;font-weight:600}
+.playlist-item-meta{font-size:.75rem;color:var(--text2)}
+
+/* ═══ SETTINGS ROW ═══ */
+.settings-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.settings-row label{color:var(--text2);font-size:.82rem;min-width:60px}
+.settings-row select{padding:8px 12px;border:none;border-radius:8px;background:var(--bg3);color:var(--text);font-size:.82rem}
+
+/* ═══ EMPTY STATE ═══ */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3)}
+.empty-state .icon{font-size:3rem;margin-bottom:12px}
+
+/* ═══ ERROR ═══ */
+.error-box{background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.2);border-radius:10px;padding:12px;color:#ff3b30;margin-bottom:12px;font-size:.85rem}
 .hidden{display:none!important}
-.error-box{background:rgba(248,113,113,.15);border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:14px;color:#fca5a5;margin-bottom:16px;font-size:.9rem}
-.playlist-item{display:flex;align-items:center;justify-content:space-between;padding:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;margin-bottom:10px;transition:background .15s}
-.playlist-item:hover{background:rgba(255,255,255,.07)}
-.playlist-info{flex:1}.playlist-name{font-weight:600;font-size:.95rem;margin-bottom:2px}
-.playlist-meta{color:#a5a3c9;font-size:.8rem}
-.playlist-actions{display:flex;gap:8px;align-items:center}
-.empty-state{text-align:center;padding:30px 20px;color:#7a78a0}
-.empty-state .icon{font-size:2.5rem;margin-bottom:10px}
-.refresh-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#a5a3c9;font-size:.8rem;cursor:pointer;transition:all .2s;margin-bottom:16px}
-.refresh-btn:hover{background:rgba(255,255,255,.12);color:#fff}
-.badge{display:inline-block;padding:4px 10px;border-radius:6px;font-size:.7rem;font-weight:600}
-.badge-green{background:rgba(52,211,153,.15);color:#34d399}
-.badge-yellow{background:rgba(251,191,36,.15);color:#fbbf24}
-.badge-red{background:rgba(248,113,113,.15);color:#f87171}
-.badge-blue{background:rgba(96,165,250,.15);color:#60a5fa}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.footer{text-align:center;color:#5a5880;font-size:.75rem;margin-top:30px;padding-bottom:16px}
-.chip{display:inline-block;padding:6px 14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:20px;font-size:.8rem;cursor:pointer;transition:all .2s;margin:4px}
-.chip:hover,.chip.active{background:rgba(124,109,255,.2);border-color:rgba(124,109,255,.4)}
+
+/* ═══ SPINNER ═══ */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--bg4);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ═══ DUPLICATE ═══ */
+.dup-group{background:rgba(255,59,48,.06);border:1px solid rgba(255,59,48,.12);border-radius:10px;padding:12px;margin-bottom:8px}
+.dup-file{display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:.82rem}
+
+/* ═══ META GRID ═══ */
 .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.meta-field label{display:block;font-size:.75rem;color:#a5a3c9;margin-bottom:4px}
-.meta-field input{width:100%;padding:8px 12px;border:1px solid #4a4772;border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-size:.85rem;outline:none}
-.settings-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
-.settings-row label{color:#a5a3c9;font-size:.85rem;min-width:70px}
-.settings-row select,.settings-row input{padding:8px 12px;border:1px solid #4a4772;border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-size:.85rem}
-.dup-group{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.15);border-radius:12px;padding:14px;margin-bottom:10px}
-.dup-file{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:.85rem;color:#c4c2e0}
+.meta-field label{display:block;font-size:.7rem;color:var(--text2);margin-bottom:3px}
+.meta-field input{width:100%;padding:8px 10px;border:none;border-radius:8px;background:var(--bg3);color:var(--text);font-size:.85rem;outline:none}
+
+/* ═══ MODAL OVERLAY ═══ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150;display:flex;align-items:center;justify-content:center;padding:20px;display:none}
+.modal-overlay.open{display:flex}
+.modal-content{background:var(--bg2);border-radius:16px;padding:20px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto}
+
+/* ═══ OFFLINE INDICATOR ═══ */
+.offline-badge{display:inline-flex;align-items:center;gap:3px;font-size:.65rem;color:var(--text3)}
+.offline-badge.available{color:#34c759}
+.song-row-offline{position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:2px;background:#34c759}
+
+/* ═══ LIBRARY SUBTABS ═══ */
+.lib-subtabs{display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--border)}
+.lib-subtab{padding:8px 16px;font-size:.82rem;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.lib-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ═══ REFRESH BTN ═══ */
+.refresh-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:var(--bg3);border-radius:8px;color:var(--text2);font-size:.78rem;cursor:pointer;border:none}
+
+/* ═══ FOOTER ═══ */
+.footer{text-align:center;color:var(--text3);font-size:.7rem;padding:20px 16px}
 </style>
 </head>
 <body>
-<div class="container">
-<h1>🎵 YT Music Downloader</h1>
-<p class="subtitle">Download, manage & import YouTube Music</p>
-
-<div class="tab-nav">
-<button class="tab-btn active" onclick="switchTab('download')">⬇️ Download</button>
-<button class="tab-btn" onclick="switchTab('search')">🔍 Search</button>
-<button class="tab-btn" onclick="switchTab('library')">📚 Library</button>
-<button class="tab-btn" onclick="switchTab('discover')">🌍 Discover</button>
-<button class="tab-btn" onclick="switchTab('tools')">🛠 Tools</button>
-<button class="tab-btn" onclick="switchTab('import')">🍎 Import</button>
-</div>
-
-<!-- ═══════════ DOWNLOAD TAB ═══════════ -->
-<div id="tab-download" class="tab-content active">
-<div class="card" style="margin-bottom:16px">
-<div class="card-title">⚙️ Download Settings</div>
-<div class="settings-row">
-<label>Format</label>
-<select id="dlFormat"><option value="mp3">MP3</option><option value="m4a">M4A</option><option value="flac">FLAC</option><option value="opus">OPUS</option><option value="wav">WAV</option></select>
-<label>Quality</label>
-<select id="dlQuality"><option value="0">Best</option><option value="2">High</option><option value="5">Medium</option><option value="9">Small</option></select>
-</div>
-</div>
-
-<div class="input-group">
-<input type="text" id="playlistUrl" placeholder="YouTube Music playlist URL..." />
-<button class="btn-primary" id="fetchBtn" onclick="fetchPlaylist()">Load</button>
-</div>
-<div id="errorBox" class="error-box hidden"></div>
-
-<div id="playlistCard" class="card hidden">
-<div class="card-title">📋 Playlist Tracks</div>
-<p id="trackCount" style="color:#a5a3c9;margin-bottom:10px;font-size:.85rem"></p>
-<ul id="trackList" class="track-list"></ul>
-<div style="margin-top:16px;text-align:center">
-<button class="btn-primary" id="downloadBtn" onclick="startDownload()">⬇️ Download All</button>
-</div>
-</div>
-
-<div id="statusSection" class="status-section">
-<div class="card">
-<div class="card-title"><span id="statusTitle">⬇️ Downloading...</span></div>
-<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
-<p id="progressText" style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px"></p>
-<div id="downloadList"></div>
-</div>
-<div id="doneCard" class="card hidden"><div class="summary" id="doneSummary"></div></div>
-</div>
-
-<!-- Spotify Quick Download -->
-<div class="card" style="margin-top:16px">
-<div class="card-title">🟢 Spotify Playlist Download</div>
-<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px">Paste a Spotify playlist link to download all songs from YouTube.</p>
-<div class="input-group" style="margin-bottom:0">
-<input type="text" id="spotifyQuickUrl" placeholder="https://open.spotify.com/playlist/..." onkeydown="if(event.key==='Enter')spotifyQuickLoad()"/>
-<button class="btn-green btn-sm" onclick="spotifyQuickLoad()">🟢 Load & Download</button>
-</div>
-<div id="spotifyQuickResults" class="hidden" style="margin-top:12px"></div>
-</div>
-
-<!-- Feature 1: Batch Download -->
-<div class="card" style="margin-top:16px">
-<div class="card-title">📥 Batch URL Download</div>
-<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px">Paste multiple YouTube URLs (one per line) to download into one playlist.</p>
-<textarea id="batchUrls" placeholder="https://youtube.com/watch?v=...&#10;https://youtube.com/watch?v=...&#10;https://music.youtube.com/playlist?list=..."></textarea>
-<div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
-<input type="text" id="batchPlaylistName" placeholder="Playlist name" style="flex:1" />
-<button class="btn-green" id="batchBtn" onclick="startBatchDownload()">📥 Download All</button>
-</div>
-</div>
-</div>
-
-<!-- ═══════════ SEARCH TAB ═══════════ -->
-<div id="tab-search" class="tab-content">
-<div class="input-group">
-<input type="text" id="searchQuery" placeholder="Search for a song on YouTube..." />
-<button class="btn-primary" id="searchBtn" onclick="searchSongs()">🔍 Search</button>
-</div>
-<div id="searchErrorBox" class="error-box hidden"></div>
-<div id="searchResults" class="hidden"><div class="card"><div class="card-title">🎵 Results</div><div id="searchResultsList"></div></div></div>
-<div id="addToPlaylistCard" class="card hidden" style="position:sticky;top:20px;z-index:10;border-color:rgba(124,109,255,.4);background:rgba(30,28,60,.95)">
-<div class="card-title">➕ Add "<span id="selectedSongTitle"></span>"</div>
-<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-<select id="playlistSelect" style="flex:1"><option value="">-- Select playlist --</option></select>
-<span style="color:#7a78a0">or</span>
-<input type="text" id="newPlaylistName" placeholder="New playlist name" style="flex:1" />
-</div>
-<div style="display:flex;gap:8px;justify-content:flex-end">
-<button class="btn-secondary btn-sm" onclick="cancelAddToPlaylist()">Cancel</button>
-<button class="btn-green btn-sm" id="downloadSongBtn" onclick="downloadSelectedSong()">⬇️ Download</button>
-</div>
-<div id="songDownloadStatus" style="margin-top:10px"></div>
-</div>
-<!-- Feature 6: Related -->
-<div id="relatedCard" class="card hidden">
-<div class="card-title">🔁 Related Songs</div>
-<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px">Songs related to your last download.</p>
-<div id="relatedList"></div>
-</div>
-</div>
-
-<!-- ═══════════ LIBRARY TAB (F12, F13, F14) ═══════════ -->
-<div id="tab-library" class="tab-content">
-<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-<input type="text" id="libSearchInput" placeholder="Search your library..." style="flex:1" />
-<button class="btn-primary btn-sm" onclick="searchLibrary()">🔍</button>
-<button class="refresh-btn" onclick="loadLibrary()">🔄 Refresh</button>
-</div>
-<div id="libErrorBox" class="error-box hidden"></div>
-
-<div id="libStats" class="card" style="margin-bottom:12px">
-<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:.85rem;color:#a5a3c9">
-<span id="libStatTotal">Loading...</span>
-</div>
-</div>
-
-<!-- Feature 13: Smart Playlists -->
-<div class="card">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-<div class="card-title" style="margin-bottom:0">🧠 Smart Playlists</div>
-<button class="btn-primary btn-sm" onclick="showCreateSmart()">+ New</button>
-</div>
-<div id="smartPlaylistList"><p style="color:#7a78a0;font-size:.85rem">Loading...</p></div>
-</div>
-
-<!-- Feature 14: Duplicates -->
-<div id="dupCard" class="card hidden">
-<div class="card-title">🔍 Duplicate Songs</div>
-<div id="dupList"></div>
-</div>
-
-<!-- Library browser -->
-<div id="libraryContent"></div>
-
-<!-- Feature 4: Metadata Editor Modal -->
-<div id="metaModal" class="card hidden" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;width:90%;max-width:500px;background:rgba(20,18,50,.98);border:2px solid rgba(124,109,255,.4)">
-<div class="card-title">✏️ Edit Metadata</div>
-<div class="meta-grid">
-<div class="meta-field"><label>Title</label><input type="text" id="metaTitle" /></div>
-<div class="meta-field"><label>Artist</label><input type="text" id="metaArtist" /></div>
-<div class="meta-field"><label>Album</label><input type="text" id="metaAlbum" /></div>
-<div class="meta-field"><label>Genre</label><input type="text" id="metaGenre" /></div>
-<div class="meta-field"><label>Year</label><input type="text" id="metaDate" /></div>
-</div>
-<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-<button class="btn-secondary btn-sm" onclick="closeMetaEditor()">Cancel</button>
-<button class="btn-green btn-sm" id="metaSaveBtn" onclick="saveMetadata()">💾 Save</button>
-</div>
-<div id="metaStatus" style="margin-top:8px"></div>
-</div>
-
-<!-- Smart Playlist Create Modal -->
-<div id="smartModal" class="card hidden" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;width:90%;max-width:450px;background:rgba(20,18,50,.98);border:2px solid rgba(124,109,255,.4)">
-<div class="card-title">🧠 Create Smart Playlist</div>
-<div class="meta-field" style="margin-bottom:10px"><label>Name</label><input type="text" id="smartName" /></div>
-<div class="meta-field" style="margin-bottom:10px"><label>Sort By</label>
-<select id="smartSort"><option value="">Default</option><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="largest">Largest Files</option></select></div>
-<div class="meta-field" style="margin-bottom:10px"><label>Format Filter</label>
-<select id="smartFormat"><option value="">All</option><option value="mp3">MP3</option><option value="flac">FLAC</option><option value="m4a">M4A</option></select></div>
-<div class="meta-field" style="margin-bottom:10px"><label>Limit</label><input type="text" id="smartLimit" value="50" /></div>
-<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-<button class="btn-secondary btn-sm" onclick="closeSmartModal()">Cancel</button>
-<button class="btn-green btn-sm" onclick="createSmartPlaylist()">Create</button>
-</div>
-</div>
-</div>
-
-<!-- ═══════════ DISCOVER TAB (F7, F8, Suggested) ═══════════ -->
-<div id="tab-discover" class="tab-content">
-<!-- Suggested for You -->
-<div class="card">
-<div class="card-title">💡 Suggested for You</div>
-<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:12px">Based on songs in your library — finds similar music via YouTube's related mix.</p>
-<div id="suggestedInfo" style="margin-bottom:12px"></div>
-<button class="btn-green btn-sm" id="suggestBtn" onclick="loadSuggested()">🔮 Discover New Music</button>
-<div id="suggestedResults" class="hidden" style="margin-top:14px">
-<div id="suggestedList" style="max-height:400px;overflow-y:auto"></div>
-<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-<input type="text" id="suggestPlaylistName" placeholder="Playlist name for downloads" style="flex:1" />
-<button class="btn-primary btn-sm" id="suggestDlAllBtn" onclick="downloadAllSuggested()">⬇️ Download All</button>
-</div>
-</div>
-</div>
-<!-- Feature 7: Charts -->
-<div class="card">
-<div class="card-title">📊 YouTube Music Charts</div>
-<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:12px">Browse and download trending music.</p>
-<div id="chartsList" style="display:flex;flex-wrap:wrap;gap:8px">
-<span class="spinner"></span> Loading charts...
-</div>
-</div>
-<div id="chartTracks" class="card hidden">
-<div class="card-title"><span id="chartTitle">Chart</span></div>
-<div id="chartTrackList" style="max-height:400px;overflow-y:auto"></div>
-<div style="margin-top:12px;text-align:center">
-<button class="btn-green btn-sm" id="chartDlBtn" onclick="downloadChart()">⬇️ Download All</button>
-</div>
-</div>
-
-<!-- Feature 8: Artist Search -->
-<div class="card" style="margin-top:12px">
-<div class="card-title">🎤 Artist Search</div>
-<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px">Find songs by an artist.</p>
-<div class="input-group" style="margin-bottom:0">
-<input type="text" id="artistQuery" placeholder="Artist name..." />
-<button class="btn-primary btn-sm" onclick="searchArtist()">🎤 Find</button>
-</div>
-</div>
-<div id="artistResults" class="card hidden">
-<div class="card-title">🎤 Results</div>
-<div id="artistResultsList" style="max-height:350px;overflow-y:auto"></div>
-</div>
-</div>
-
-<!-- ═══════════ TOOLS TAB (F2 Spotify, F9 Watcher, F11 API) ═══════════ -->
-<div id="tab-tools" class="tab-content">
-  <!-- Feature 2: Spotify -->
-  <div class="card">
-  <div class="card-title">🟢 Spotify Import</div>
-  <p style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px">Paste a Spotify playlist URL to find and download songs from YouTube.</p>
-  <div class="input-group" style="margin-bottom:0">
-  <input type="text" id="spotifyUrl" placeholder="https://open.spotify.com/playlist/..." onkeydown="if(event.key==='Enter')loadSpotifyPlaylist()"/>
-  <button class="btn-green btn-sm" id="spotifyBtn" onclick="loadSpotifyPlaylist()">Load</button>
-  </div>
-  <div id="spotifyResults" class="hidden" style="margin-top:12px"></div>
-  <div id="spotifyStatusSection" class="hidden" style="margin-top:12px">
-    <div class="progress-bar-container"><div class="progress-bar green" id="spotifyProgressBar"></div></div>
-    <p id="spotifyProgressText" style="color:#a5a3c9;font-size:.8rem;margin-bottom:8px"></p>
-    <div id="spotifyDownloadList" style="max-height:200px;overflow-y:auto"></div>
-  </div>
+<div id="app" data-theme="dark">
+  <!-- ═══ HEADER ═══ -->
+  <div class="app-header">
+    <h1>Music</h1>
+    <div style="display:flex;gap:4px;align-items:center">
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <span id="themeIcon">☀️</span>
+      </button>
+    </div>
   </div>
 
-<!-- Feature 9: Auto-Import Watcher -->
-<div class="card">
-<div class="card-title">👁 Auto-Import Watcher</div>
-<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px">Watch a playlist folder — any new downloads auto-import to Apple Music.</p>
-<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-<select id="watcherPlaylist" style="flex:1"><option value="">-- Select playlist --</option></select>
-<button class="btn-green btn-sm" id="watcherStartBtn" onclick="startWatcher()">▶ Start</button>
-<button class="btn-red btn-sm" id="watcherStopBtn" onclick="stopWatcher()" disabled>⏹ Stop</button>
-</div>
-<div id="watcherStatus" style="margin-top:8px"></div>
-</div>
+  <!-- ═══ SCROLLABLE CONTENT ═══ -->
+  <div class="main-scroll">
 
-<!-- Feature 11: API Key -->
-<div class="card">
-<div class="card-title">🔑 REST API Key</div>
-<p style="color:#a5a3c9;font-size:.8rem;margin-bottom:8px">Use this key for external access (Shortcuts, Alfred, etc.)</p>
-<div style="display:flex;gap:8px;align-items:center">
-<code id="apiKeyDisplay" style="flex:1;padding:8px 12px;background:rgba(0,0,0,.3);border-radius:8px;font-size:.8rem;word-break:break-all">Loading...</code>
-<button class="btn-secondary btn-sm" onclick="copyApiKey()">📋 Copy</button>
-</div>
-<p style="color:#5a5880;font-size:.7rem;margin-top:8px">Usage: <code>?apiKey=YOUR_KEY</code> or <code>X-API-Key: YOUR_KEY</code></p>
-</div>
-</div>
+    <!-- ═══ LISTEN NOW PAGE ═══ -->
+    <div id="page-listen" class="page active">
+      <div class="section-title">Download Music</div>
 
-<!-- ═══════════ IMPORT TAB ═══════════ -->
-<div id="tab-import" class="tab-content">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-<p style="color:#a5a3c9;font-size:.85rem">Import downloaded playlists into Apple Music.</p>
-<button class="refresh-btn" onclick="loadImportPlaylists()">🔄 Refresh</button>
-</div>
-<div id="importErrorBox" class="error-box hidden"></div>
-<div id="importListContainer"><div class="empty-state"><div class="icon">📂</div><p>Loading...</p></div></div>
-<div id="importStatusSection" class="status-section">
-<div class="card">
-<div class="card-title"><span id="importStatusTitle">🍎 Importing...</span></div>
-<div class="progress-bar-container"><div class="progress-bar green" id="importProgressBar"></div></div>
-<p id="importProgressText" style="color:#a5a3c9;font-size:.8rem;margin-bottom:10px"></p>
-<div id="importList"></div>
-</div>
-<div id="importDoneCard" class="card hidden"><div class="summary" id="importDoneSummary"></div></div>
-</div>
-</div>
+      <div class="card">
+        <div class="card-title">Download Settings</div>
+        <div class="settings-row">
+          <label>Format</label>
+          <select id="dlFormat"><option value="mp3">MP3</option><option value="m4a" selected>M4A</option><option value="flac">FLAC</option><option value="opus">OPUS</option><option value="wav">WAV</option></select>
+          <label>Quality</label>
+          <select id="dlQuality"><option value="0">Best</option><option value="2">High</option><option value="5">Medium</option><option value="9">Small</option></select>
+        </div>
+      </div>
 
-<div class="footer">Built with yt-dlp & ffmpeg · <a href="https://github.com" style="color:#7c6dff" target="_blank">GitHub</a></div>
+      <div class="card">
+        <div class="card-title">YouTube Playlist</div>
+        <div class="input-row">
+          <input type="text" id="playlistUrl" class="input-field" placeholder="YouTube Music playlist URL...">
+          <button class="btn btn-accent" id="fetchBtn" onclick="fetchPlaylist()">Load</button>
+        </div>
+        <div id="errorBox" class="error-box hidden"></div>
+        <div id="playlistCard" class="hidden">
+          <p id="trackCount" style="color:var(--text2);font-size:.82rem;margin-bottom:10px"></p>
+          <div id="trackList" style="max-height:250px;overflow-y:auto"></div>
+          <div style="margin-top:14px;text-align:center">
+            <button class="btn btn-accent" id="downloadBtn" onclick="startDownload()">Download All</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="statusSection" class="hidden">
+        <div class="card">
+          <div class="card-title"><span id="statusTitle">Downloading...</span></div>
+          <div class="progress-bar"><div class="progress-fill" id="progressBar"></div></div>
+          <p id="progressText" style="color:var(--text2);font-size:.78rem;margin-bottom:8px"></p>
+          <div id="downloadList"></div>
+        </div>
+        <div id="doneCard" class="card hidden"><div style="text-align:center;padding:10px" id="doneSummary"></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Spotify Playlist</div>
+        <p class="section-subtitle">Paste a Spotify playlist link to download from YouTube</p>
+        <div class="input-row" style="margin-bottom:0">
+          <input type="text" id="spotifyQuickUrl" class="input-field" placeholder="https://open.spotify.com/playlist/..." onkeydown="if(event.key==='Enter')spotifyQuickLoad()">
+          <button class="btn btn-green btn-sm" onclick="spotifyQuickLoad()">Load & Download</button>
+        </div>
+        <div id="spotifyQuickResults" class="hidden" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Batch Download</div>
+        <p class="section-subtitle">Paste multiple URLs (one per line)</p>
+        <textarea id="batchUrls" class="input-field" placeholder="https://youtube.com/watch?v=...&#10;https://music.youtube.com/playlist?list=..."></textarea>
+        <div class="input-row" style="margin-top:8px">
+          <input type="text" id="batchPlaylistName" class="input-field" placeholder="Playlist name">
+          <button class="btn btn-green" id="batchBtn" onclick="startBatchDownload()">Download All</button>
+        </div>
+      </div>
+
+      <!-- Quick Play Recent -->
+      <div id="recentSection" class="hidden">
+        <div class="section-title">Recently Added</div>
+        <div id="recentList"></div>
+      </div>
+    </div>
+
+    <!-- ═══ BROWSE PAGE ═══ -->
+    <div id="page-browse" class="page">
+      <div class="section-title">Suggested For You</div>
+      <div class="card">
+        <p class="section-subtitle">Based on songs in your library</p>
+        <div id="suggestedInfo" style="margin-bottom:10px"></div>
+        <button class="btn btn-accent btn-sm" id="suggestBtn" onclick="loadSuggested()">Discover New Music</button>
+        <div id="suggestedResults" class="hidden" style="margin-top:12px">
+          <div id="suggestedList" style="max-height:350px;overflow-y:auto"></div>
+          <div class="input-row" style="margin-top:10px">
+            <input type="text" id="suggestPlaylistName" class="input-field" placeholder="Playlist name for downloads">
+            <button class="btn btn-accent btn-sm" id="suggestDlAllBtn" onclick="downloadAllSuggested()">Download All</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Charts</div>
+      <div class="card">
+        <p class="section-subtitle">Browse trending music</p>
+        <div id="chartsList" style="display:flex;flex-wrap:wrap;gap:6px"><span class="spinner"></span> Loading...</div>
+      </div>
+      <div id="chartTracks" class="card hidden">
+        <div class="card-title"><span id="chartTitle">Chart</span></div>
+        <div id="chartTrackList" style="max-height:350px;overflow-y:auto"></div>
+        <div style="margin-top:10px;text-align:center">
+          <button class="btn btn-green btn-sm" id="chartDlBtn" onclick="downloadChart()">Download All</button>
+        </div>
+      </div>
+
+      <div class="section-title">Artist Search</div>
+      <div class="card">
+        <div class="input-row" style="margin-bottom:0">
+          <input type="text" id="artistQuery" class="input-field" placeholder="Artist name...">
+          <button class="btn btn-accent btn-sm" onclick="searchArtist()">Search</button>
+        </div>
+      </div>
+      <div id="artistResults" class="card hidden">
+        <div class="card-title">Results</div>
+        <div id="artistResultsList" style="max-height:300px;overflow-y:auto"></div>
+      </div>
+    </div>
+
+    <!-- ═══ LIBRARY PAGE ═══ -->
+    <div id="page-library" class="page">
+      <div class="input-row">
+        <input type="text" id="libSearchInput" class="input-field" placeholder="Search library..." onkeydown="if(event.key==='Enter')searchLibrary()">
+        <button class="btn btn-secondary btn-sm" onclick="searchLibrary()">Search</button>
+        <button class="refresh-btn" onclick="loadLibrary()">Refresh</button>
+      </div>
+      <div id="libErrorBox" class="error-box hidden"></div>
+      <div id="libStats" style="padding:0 0 8px;font-size:.82rem;color:var(--text2)"></div>
+
+      <div class="lib-subtabs">
+        <div class="lib-subtab active" onclick="switchLibTab('songs')">Songs</div>
+        <div class="lib-subtab" onclick="switchLibTab('artists')">Artists</div>
+        <div class="lib-subtab" onclick="switchLibTab('albums')">Albums</div>
+        <div class="lib-subtab" onclick="switchLibTab('playlists')">Playlists</div>
+      </div>
+
+      <div id="libContent-songs" class="lib-content"></div>
+      <div id="libContent-artists" class="lib-content hidden"></div>
+      <div id="libContent-albums" class="lib-content hidden"></div>
+      <div id="libContent-playlists" class="lib-content hidden"></div>
+    </div>
+
+    <!-- ═══ SEARCH PAGE ═══ -->
+    <div id="page-search" class="page">
+      <div class="section-title">Search</div>
+      <div class="input-row">
+        <input type="text" id="searchQuery" class="input-field" placeholder="Search for a song on YouTube..." onkeydown="if(event.key==='Enter')searchSongs()">
+        <button class="btn btn-accent" id="searchBtn" onclick="searchSongs()">Search</button>
+      </div>
+      <div id="searchErrorBox" class="error-box hidden"></div>
+      <div id="searchResults" class="hidden"><div class="card"><div class="card-title">Results</div><div id="searchResultsList"></div></div></div>
+      <div id="addToPlaylistCard" class="card hidden" style="border:2px solid var(--accent)">
+        <div class="card-title">Add "<span id="selectedSongTitle"></span>"</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+          <select id="playlistSelect" class="input-field" style="flex:1"><option value="">-- Select playlist --</option></select>
+          <span style="color:var(--text3)">or</span>
+          <input type="text" id="newPlaylistName" class="input-field" placeholder="New playlist name" style="flex:1">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-secondary btn-sm" onclick="cancelAddToPlaylist()">Cancel</button>
+          <button class="btn btn-green btn-sm" id="downloadSongBtn" onclick="downloadSelectedSong()">Download</button>
+        </div>
+        <div id="songDownloadStatus" style="margin-top:8px"></div>
+      </div>
+      <div id="relatedCard" class="card hidden">
+        <div class="card-title">Related Songs</div>
+        <div id="relatedList"></div>
+      </div>
+    </div>
+
+    <!-- ═══ TOOLS PAGE ═══ -->
+    <div id="page-tools" class="page">
+      <div class="section-title">Spotify Import</div>
+      <div class="card">
+        <p class="section-subtitle">Import a Spotify playlist via YouTube</p>
+        <div class="input-row" style="margin-bottom:0">
+          <input type="text" id="spotifyUrl" class="input-field" placeholder="https://open.spotify.com/playlist/..." onkeydown="if(event.key==='Enter')loadSpotifyPlaylist()">
+          <button class="btn btn-green btn-sm" id="spotifyBtn" onclick="loadSpotifyPlaylist()">Load</button>
+        </div>
+        <div id="spotifyResults" class="hidden" style="margin-top:10px"></div>
+        <div id="spotifyStatusSection" class="hidden" style="margin-top:10px">
+          <div class="progress-bar"><div class="progress-fill green" id="spotifyProgressBar"></div></div>
+          <p id="spotifyProgressText" style="color:var(--text2);font-size:.78rem;margin-bottom:6px"></p>
+          <div id="spotifyDownloadList" style="max-height:180px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <div class="section-title">Smart Playlists</div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-weight:600">Auto-generated playlists</span>
+          <button class="btn btn-accent btn-sm" onclick="showCreateSmart()">+ New</button>
+        </div>
+        <div id="smartPlaylistList"><p style="color:var(--text3);font-size:.82rem">Loading...</p></div>
+      </div>
+
+      <div class="section-title">Duplicates</div>
+      <div id="dupCard" class="card hidden">
+        <div id="dupList"></div>
+      </div>
+
+      <div class="section-title">Auto-Import Watcher</div>
+      <div class="card">
+        <p class="section-subtitle">Watch a playlist for auto Apple Music import</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="watcherPlaylist" class="input-field" style="flex:1"><option value="">-- Select playlist --</option></select>
+          <button class="btn btn-green btn-sm" id="watcherStartBtn" onclick="startWatcher()">Start</button>
+          <button class="btn btn-red btn-sm" id="watcherStopBtn" onclick="stopWatcher()" disabled>Stop</button>
+        </div>
+        <div id="watcherStatus" style="margin-top:6px"></div>
+      </div>
+
+      <div class="section-title">Apple Music Import</div>
+      <div id="importListContainer"><div class="empty-state"><div class="icon">📂</div><p>Loading...</p></div></div>
+      <div id="importStatusSection" class="hidden">
+        <div class="card">
+          <div class="card-title"><span id="importStatusTitle">Importing...</span></div>
+          <div class="progress-bar"><div class="progress-fill green" id="importProgressBar"></div></div>
+          <p id="importProgressText" style="color:var(--text2);font-size:.78rem;margin-bottom:8px"></p>
+          <div id="importList"></div>
+        </div>
+        <div id="importDoneCard" class="card hidden"><div style="text-align:center;padding:10px" id="importDoneSummary"></div></div>
+      </div>
+
+      <div class="section-title">API Key</div>
+      <div class="card">
+        <p class="section-subtitle">Use for Shortcuts, Alfred, etc.</p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <code id="apiKeyDisplay" style="flex:1;padding:8px 12px;background:var(--bg);border-radius:8px;font-size:.78rem;word-break:break-all">Loading...</code>
+          <button class="btn btn-secondary btn-sm" onclick="copyApiKey()">Copy</button>
+        </div>
+      </div>
+
+      <div class="footer">Built with yt-dlp & ffmpeg</div>
+    </div>
+  </div>
+
+  <!-- ═══ MINI PLAYER ═══ -->
+  <div class="mini-player" id="miniPlayer" onclick="openFullPlayer()">
+    <div class="mini-player-progress" id="miniProgress"></div>
+    <img class="mini-player-art" id="miniArt" src="" alt="">
+    <div class="mini-player-info">
+      <div class="mini-player-title" id="miniTitle">Not Playing</div>
+      <div class="mini-player-artist" id="miniArtist"></div>
+    </div>
+    <div class="mini-player-controls" onclick="event.stopPropagation()">
+      <button onclick="prevTrack()" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+      <button onclick="togglePlay()" id="miniPlayBtn" title="Play/Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+      <button onclick="nextTrack()" title="Next"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ═══ TAB BAR ═══ -->
+  <div class="tab-bar">
+    <button class="tab-bar-item active" onclick="switchPage('listen')">
+      <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+      <span>Listen Now</span>
+    </button>
+    <button class="tab-bar-item" onclick="switchPage('browse')">
+      <svg viewBox="0 0 24 24"><path d="M4 4h7V2H2v9h2V4zm0 16h7v2H2v-9h2v7zm16 0h-7v2h9v-9h-2v7zM20 4h-7V2h9v9h-2V4z"/></svg>
+      <span>Browse</span>
+    </button>
+    <button class="tab-bar-item" onclick="switchPage('library')">
+      <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg>
+      <span>Library</span>
+    </button>
+    <button class="tab-bar-item" onclick="switchPage('search')">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <span>Search</span>
+    </button>
+    <button class="tab-bar-item" onclick="switchPage('tools')">
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      <span>Tools</span>
+    </button>
+  </div>
+
+  <!-- ═══ FULL SCREEN PLAYER ═══ -->
+  <div class="full-player" id="fullPlayer">
+    <div class="full-player-header">
+      <button onclick="closeFullPlayer()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+        Close
+      </button>
+      <span>Now Playing</span>
+      <button onclick="closeFullPlayer()" style="visibility:hidden">Close</button>
+    </div>
+    <div class="full-player-artwork">
+      <img id="fullArt" src="" alt="Album Art">
+    </div>
+    <div class="full-player-info">
+      <div class="full-player-title" id="fullTitle">Not Playing</div>
+      <div class="full-player-artist" id="fullArtist"></div>
+    </div>
+    <div class="full-player-progress">
+      <div class="full-player-bar" id="fullProgressBar" onclick="seekTo(event)">
+        <div class="full-player-bar-fill" id="fullProgressFill" style="width:0%"></div>
+      </div>
+      <div class="full-player-times">
+        <span id="fullTimeCurrent">0:00</span>
+        <span id="fullTimeDuration">0:00</span>
+      </div>
+    </div>
+    <div class="full-player-controls">
+      <button class="shuffle-btn" id="shuffleBtn" onclick="toggleShuffle()"><svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
+      <button class="skip-btn" onclick="prevTrack()"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+      <button class="play-btn" id="fullPlayBtn" onclick="togglePlay()"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+      <button class="skip-btn" onclick="nextTrack()"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+      <button class="repeat-btn" id="repeatBtn" onclick="toggleRepeat()"><svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
+    </div>
+    <div class="full-player-volume">
+      <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+      <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1" oninput="setVolume(this.value)">
+      <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+    </div>
+    <div class="full-player-bottom">
+      <button onclick="downloadCurrentSong()" title="Download for Offline"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button>
+      <button title="Lyrics"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></button>
+      <button onclick="addToQueueFromCurrent()" title="Add to Queue"><svg viewBox="0 0 24 24"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ═══ MODALS ═══ -->
+  <div class="modal-overlay" id="metaModal">
+    <div class="modal-content">
+      <div class="card-title" style="margin-bottom:14px">Edit Metadata</div>
+      <div class="meta-grid">
+        <div class="meta-field"><label>Title</label><input type="text" id="metaTitle"></div>
+        <div class="meta-field"><label>Artist</label><input type="text" id="metaArtist"></div>
+        <div class="meta-field"><label>Album</label><input type="text" id="metaAlbum"></div>
+        <div class="meta-field"><label>Genre</label><input type="text" id="metaGenre"></div>
+        <div class="meta-field"><label>Year</label><input type="text" id="metaDate"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-secondary btn-sm" onclick="closeMetaEditor()">Cancel</button>
+        <button class="btn btn-green btn-sm" id="metaSaveBtn" onclick="saveMetadata()">Save</button>
+      </div>
+      <div id="metaStatus" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="smartModal">
+    <div class="modal-content">
+      <div class="card-title" style="margin-bottom:14px">Create Smart Playlist</div>
+      <div class="meta-field" style="margin-bottom:10px"><label>Name</label><input type="text" id="smartName"></div>
+      <div class="meta-field" style="margin-bottom:10px"><label>Sort By</label>
+        <select id="smartSort" class="input-field" style="width:100%"><option value="">Default</option><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="largest">Largest Files</option></select></div>
+      <div class="meta-field" style="margin-bottom:10px"><label>Format Filter</label>
+        <select id="smartFormat" class="input-field" style="width:100%"><option value="">All</option><option value="mp3">MP3</option><option value="flac">FLAC</option><option value="m4a">M4A</option></select></div>
+      <div class="meta-field" style="margin-bottom:10px"><label>Limit</label><input type="text" id="smartLimit" value="50"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-secondary btn-sm" onclick="closeSmartModal()">Cancel</button>
+        <button class="btn btn-green btn-sm" onclick="createSmartPlaylist()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audioPlayer" preload="auto"></audio>
 </div>
 
 <script>
-// ═══════════ TAB NAV ═══════════
-const TABS=['download','search','library','discover','tools','import'];
-function switchTab(tab){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-  const idx=TABS.indexOf(tab);if(idx<0)return;
-  document.querySelectorAll('.tab-btn')[idx].classList.add('active');
-  document.getElementById('tab-'+tab).classList.add('active');
-  if(tab==='library')loadLibrary();
-  if(tab==='import')loadImportPlaylists();
-  if(tab==='search')loadSearchPlaylistOptions();
-  if(tab==='discover')loadCharts();
-  if(tab==='tools'){loadApiKey();loadWatcherPlaylists();loadWatcherStatus();}
+// ═══════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════
+function getTheme(){return localStorage.getItem('music-theme')||'dark'}
+function setTheme(t){localStorage.setItem('music-theme',t);document.getElementById('app').setAttribute('data-theme',t);document.getElementById('themeIcon').textContent=t==='dark'?'☀️':'🌙'}
+function toggleTheme(){setTheme(getTheme()==='dark'?'light':'dark')}
+setTheme(getTheme());
+
+// ═══════════════════════════════════════════
+// PAGE NAV
+// ═══════════════════════════════════════════
+const PAGES=['listen','browse','library','search','tools'];
+function switchPage(p){
+  document.querySelectorAll('.tab-bar-item').forEach((b,i)=>b.classList.toggle('active',PAGES[i]===p));
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  const page=document.getElementById('page-'+p);if(page)page.classList.add('active');
+  if(p==='library')loadLibrary();
+  if(p==='browse')loadCharts();
+  if(p==='search')loadSearchPlaylistOptions();
+  if(p==='tools'){loadApiKey();loadWatcherPlaylists();loadWatcherStatus();loadImportPlaylists();}
 }
 
-// ═══════════ HELPERS ═══════════
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function escA(s){return s.replace(/'/g,"\\'").replace(/"/g,'"')}
 function safeId(s){return s.replace(/[^a-zA-Z0-9]/g,'_')}
 function $(id){return document.getElementById(id)}
 function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB'}
-function fmtDur(s){if(!s)return'';const m=Math.floor(s/60);return m+':'+(s%60).toString().padStart(2,'0')}
+function fmtDur(s){if(!s)return'–';const m=Math.floor(s/60);return m+':'+(s%60).toString().padStart(2,'0')}
 function showErr(id,msg){const b=$(id);b.textContent=msg;b.classList.remove('hidden')}
 function hideErr(id){$(id).classList.add('hidden')}
-let currentSettings={format:'mp3',quality:'0'};
 
-// ═══════════ DOWNLOAD TAB ═══════════
+// ═══════════════════════════════════════════
+// OFFLINE STORAGE (IndexedDB)
+// ═══════════════════════════════════════════
+let offlineDB=null;
+function openOfflineDB(){
+  return new Promise((resolve,reject)=>{
+    if(offlineDB)return resolve(offlineDB);
+    const req=indexedDB.open('MusicOfflineDB',2);
+    req.onupgradeneeded=e=>{const db=e.target.result;
+      if(!db.objectStoreNames.contains('songs'))db.createObjectStore('songs',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('covers'))db.createObjectStore('covers',{keyPath:'id'});
+    };
+    req.onsuccess=e=>{offlineDB=e.target.result;resolve(offlineDB)};
+    req.onerror=e=>reject(e);
+  });
+}
+async function isSongOffline(songId){const db=await openOfflineDB();return new Promise(r=>{const tx=db.transaction('songs','readonly');const s=tx.objectStore('songs');const req=s.get(songId);req.onsuccess=()=>r(!!req.result);req.onerror=()=>r(false)})}
+async function getAllOfflineSongs(){const db=await openOfflineDB();return new Promise(r=>{const tx=db.transaction('songs','readonly');const s=tx.objectStore('songs');const req=s.getAll();req.onsuccess=()=>r(req.result||[]);req.onerror=()=>r([])})}
+async function saveSongOffline(song,audioBlob,coverBlob){
+  const db=await openOfflineDB();
+  const tx=db.transaction(['songs','covers'],'readwrite');
+  tx.objectStore('songs').put({id:song.id,title:song.title,artist:song.artist,album:song.album,playlist:song.playlist,file:song.file,duration:song.duration,audioBlob,addedAt:Date.now()});
+  if(coverBlob)tx.objectStore('covers').put({id:song.id,blob:coverBlob});
+  return new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=reject});
+}
+async function getOfflineAudio(songId){const db=await openOfflineDB();return new Promise(r=>{const tx=db.transaction('songs','readonly');const req=tx.objectStore('songs').get(songId);req.onsuccess=()=>r(req.result?req.result.audioBlob:null);req.onerror=()=>r(null)})}
+async function getOfflineCover(songId){const db=await openOfflineDB();return new Promise(r=>{const tx=db.transaction('covers','readonly');const req=tx.objectStore('covers').get(songId);req.onsuccess=()=>r(req.result?req.result.blob:null);req.onerror=()=>r(null)})}
+async function removeOfflineSong(songId){const db=await openOfflineDB();const tx=db.transaction(['songs','covers'],'readwrite');tx.objectStore('songs').delete(songId);tx.objectStore('covers').delete(songId);return new Promise(r=>{tx.oncomplete=r;tx.onerror=r})}
+async function downloadForOffline(song){
+  if(await isSongOffline(song.id))return;
+  try{
+    const audioResp=await fetch(`/api/music/download?playlist=${encodeURIComponent(song.playlist)}&file=${encodeURIComponent(song.file)}`);
+    const audioBlob=await audioResp.blob();
+    let coverBlob=null;
+    try{const coverResp=await fetch(song.coverUrl);if(coverResp.ok)coverBlob=await coverResp.blob();}catch(_){}
+    await saveSongOffline(song,audioBlob,coverBlob);
+  }catch(e){console.error('Offline download failed:',e)}
+}
+openOfflineDB();
+
+// ═══════════════════════════════════════════
+// MUSIC PLAYER
+// ═══════════════════════════════════════════
+const audio=$('audioPlayer');
+let musicLibrary={songs:[],artists:[],albums:[]};
+let playQueue=[];
+let queueIndex=-1;
+let shuffleMode=false;
+let repeatMode=0; // 0=off,1=all,2=one
+let currentSong=null;
+
+function getStreamUrl(song){return `/api/music/stream/${encodeURIComponent(song.playlist)}/${encodeURIComponent(song.file)}`}
+
+async function playSong(song,fromQueue,idx){
+  currentSong=song;
+  if(idx!==undefined)queueIndex=idx;
+  // Check offline first
+  const offlineAudio=await getOfflineAudio(song.id);
+  if(offlineAudio){
+    const url=URL.createObjectURL(offlineAudio);
+    audio.src=url;
+  }else{
+    audio.src=getStreamUrl(song);
+  }
+  audio.play().catch(()=>{});
+  updatePlayerUI();
+  showMiniPlayer();
+}
+function playLibrary(songs,startIdx){
+  playQueue=[...songs];
+  queueIndex=startIdx||0;
+  if(shuffleMode)shuffleQueue();
+  playSong(playQueue[queueIndex],true,queueIndex);
+}
+function shuffleQueue(){
+  const current=playQueue.splice(queueIndex,1)[0];
+  for(let i=playQueue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[playQueue[i],playQueue[j]]=[playQueue[j],playQueue[i]]}
+  playQueue.unshift(current);queueIndex=0;
+}
+function togglePlay(){if(audio.paused)audio.play().catch(()=>{});else audio.pause()}
+function nextTrack(){
+  if(!playQueue.length)return;
+  if(repeatMode===2){audio.currentTime=0;audio.play();return}
+  queueIndex++;
+  if(queueIndex>=playQueue.length){if(repeatMode===1)queueIndex=0;else{queueIndex=playQueue.length-1;audio.pause();return;}}
+  playSong(playQueue[queueIndex],true,queueIndex);
+}
+function prevTrack(){
+  if(!playQueue.length)return;
+  if(audio.currentTime>3){audio.currentTime=0;return}
+  queueIndex--;
+  if(queueIndex<0)queueIndex=repeatMode===1?playQueue.length-1:0;
+  playSong(playQueue[queueIndex],true,queueIndex);
+}
+function toggleShuffle(){shuffleMode=!shuffleMode;$('shuffleBtn').classList.toggle('active-toggle',shuffleMode)}
+function toggleRepeat(){repeatMode=(repeatMode+1)%3;$('repeatBtn').classList.toggle('active-toggle',repeatMode>0);if(repeatMode===2)$('repeatBtn').innerHTML='<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="12" y="14.5" text-anchor="middle" font-size="6" fill="currentColor">1</text></svg>'}
+function setVolume(v){audio.volume=v}
+function seekTo(e){const bar=e.currentTarget;const pct=e.offsetX/bar.offsetWidth;audio.currentTime=pct*audio.duration}
+
+function updatePlayerUI(){
+  if(!currentSong)return;
+  const coverUrl=currentSong.coverUrl||'';
+  // Mini player
+  $('miniTitle').textContent=currentSong.title;
+  $('miniArtist').textContent=currentSong.artist;
+  if(coverUrl)$('miniArt').src=coverUrl;
+  // Full player
+  $('fullTitle').textContent=currentSong.title;
+  $('fullArtist').textContent=currentSong.artist;
+  if(coverUrl)$('fullArt').src=coverUrl;
+  // Document title
+  document.title=`${currentSong.title} - ${currentSong.artist}`;
+}
+function showMiniPlayer(){$('miniPlayer').classList.add('visible')}
+function openFullPlayer(){$('fullPlayer').classList.add('open');document.body.style.overflow='hidden'}
+function closeFullPlayer(){$('fullPlayer').classList.remove('open');document.body.style.overflow=''}
+function updatePlayButton(){
+  const icon=audio.paused?'M8 5v14l11-7z':'M6 19h4V5H6v14zm8-14v14h4V5h-4z';
+  $('miniPlayBtn').innerHTML=`<svg viewBox="0 0 24 24"><path d="${icon}"/></svg>`;
+  $('fullPlayBtn').innerHTML=`<svg viewBox="0 0 24 24"><path d="${icon}"/></svg>`;
+}
+audio.addEventListener('play',updatePlayButton);
+audio.addEventListener('pause',updatePlayButton);
+audio.addEventListener('timeupdate',()=>{
+  if(!audio.duration)return;
+  const pct=(audio.currentTime/audio.duration)*100;
+  $('miniProgress').style.width=pct+'%';
+  $('fullProgressFill').style.width=pct+'%';
+  $('fullTimeCurrent').textContent=fmtDur(Math.floor(audio.currentTime));
+  $('fullTimeDuration').textContent=fmtDur(Math.floor(audio.duration));
+});
+audio.addEventListener('ended',()=>{if(repeatMode===2){audio.currentTime=0;audio.play()}else nextTrack()});
+async function downloadCurrentSong(){if(currentSong){await downloadForOffline(currentSong);loadLibrary()}}
+
+// ═══════════════════════════════════════════
+// DOWNLOAD TAB
+// ═══════════════════════════════════════════
 let playlistUrl='';
 async function fetchPlaylist(){
   const url=$('playlistUrl').value.trim();if(!url)return;
   playlistUrl=url;const btn=$('fetchBtn');btn.disabled=true;btn.textContent='Loading...';
-  hideErr('errorBox');$('playlistCard').classList.add('hidden');$('statusSection').classList.remove('visible');
+  hideErr('errorBox');$('playlistCard').classList.add('hidden');$('statusSection').classList.add('hidden');
   try{
     const r=await fetch('/api/playlist-info?url='+encodeURIComponent(url));const d=await r.json();
     if(!r.ok){showErr('errorBox',d.error||'Error');return}
     $('trackCount').textContent=d.count+' tracks · "'+d.title+'"';
     const l=$('trackList');l.innerHTML='';
-    d.tracks.forEach(t=>{const li=document.createElement('li');li.innerHTML='<span class="track-num">'+t.index+'.</span> <div class="download-title"><div>'+esc(t.title)+'</div><div style="font-size:.75rem;color:#7a78a0">'+esc(t.artist||'')+(t.album?' · '+esc(t.album):'')+'</div></div>';l.appendChild(li)});
+    d.tracks.forEach(t=>{l.innerHTML+=`<div class="song-row"><span style="color:var(--text3);font-size:.78rem;min-width:24px">${t.index}.</span><div class="song-row-info"><div class="song-row-title">${esc(t.title)}</div><div class="song-row-artist">${esc(t.artist||'')}${t.album?' · '+esc(t.album):''}</div></div></div>`});
     $('playlistCard').classList.remove('hidden');
   }catch(e){showErr('errorBox','Connection error')}finally{btn.disabled=false;btn.textContent='Load'}
 }
 function startDownload(){
   if(!playlistUrl)return;$('downloadBtn').disabled=true;
-  $('statusSection').classList.add('visible');$('doneCard').classList.add('hidden');
-  $('downloadList').innerHTML='';$('progressBar').style.width='0%';$('statusTitle').textContent='⬇️ Downloading...';
-  const fmt=$('dlFormat').value;const q=$('dlQuality').value;
+  $('statusSection').classList.remove('hidden');$('doneCard').classList.add('hidden');
+  $('downloadList').innerHTML='';$('progressBar').style.width='0%';$('statusTitle').textContent='Downloading...';
+  const fmt=$('dlFormat').value,q=$('dlQuality').value;
   const es=new EventSource('/api/download?url='+encodeURIComponent(playlistUrl)+'&format='+fmt+'&quality='+q);
   es.addEventListener('playlist',e=>{const d=JSON.parse(e.data);$('progressText').textContent='0 / '+d.total});
   es.addEventListener('progress',e=>{const d=JSON.parse(e.data);const p=Math.round(d.current/d.total*100);$('progressBar').style.width=p+'%';$('progressText').textContent=d.current+' / '+d.total;updateDlItem('dl',d)});
   es.addEventListener('error',e=>{showErr('errorBox',JSON.parse(e.data).message);es.close()});
-  es.addEventListener('done',e=>{const d=JSON.parse(e.data);$('statusTitle').textContent='✅ Done';$('doneCard').classList.remove('hidden');$('doneSummary').innerHTML='🎉 '+esc(d.message);$('downloadBtn').disabled=false;es.close()});
+  es.addEventListener('done',e=>{const d=JSON.parse(e.data);$('statusTitle').textContent='Done!';$('doneCard').classList.remove('hidden');$('doneSummary').innerHTML=esc(d.message);$('downloadBtn').disabled=false;es.close();fetch('/api/music/library/refresh',{method:'POST'});setTimeout(()=>loadLibrary(),1000)});
   es.onerror=()=>{es.close();$('downloadBtn').disabled=false}
 }
-
-// Feature 1: Batch Download
 async function startBatchDownload(){
-  const text=$('batchUrls').value.trim();const name=$('batchPlaylistName').value.trim();
+  const text=$('batchUrls').value.trim(),name=$('batchPlaylistName').value.trim();
   if(!text||!name){showErr('errorBox','Enter URLs and playlist name');return}
   const urls=text.split('\n').map(u=>u.trim()).filter(u=>u.length>0);
   if(!urls.length){showErr('errorBox','No valid URLs');return}
-  const btn=$('batchBtn');btn.disabled=true;btn.textContent='⏳ Downloading...';
-  $('statusSection').classList.add('visible');$('doneCard').classList.add('hidden');
-  $('downloadList').innerHTML='';$('progressBar').style.width='0%';$('statusTitle').textContent='📥 Batch Downloading...';
+  const btn=$('batchBtn');btn.disabled=true;btn.textContent='Downloading...';
+  $('statusSection').classList.remove('hidden');$('doneCard').classList.add('hidden');
+  $('downloadList').innerHTML='';$('progressBar').style.width='0%';$('statusTitle').textContent='Batch Downloading...';
   try{
     const r=await fetch('/api/batch-download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({urls,playlistName:name,format:$('dlFormat').value,quality:$('dlQuality').value})});
     const reader=r.body.getReader();const dec=new TextDecoder();let buf='';
@@ -435,45 +796,44 @@ async function startBatchDownload(){
         const d=JSON.parse(l.slice(6));
         if(d.total)$('progressText').textContent='0 / '+d.total;
         if(d.current){const p=Math.round(d.current/d.total*100);$('progressBar').style.width=p+'%';$('progressText').textContent=d.current+' / '+d.total;updateDlItem('dl',d)}
-        if(d.message){$('statusTitle').textContent='✅ Done';$('doneCard').classList.remove('hidden');$('doneSummary').innerHTML='🎉 '+esc(d.message);btn.disabled=false;btn.textContent='📥 Download All'}
+        if(d.message){$('statusTitle').textContent='Done!';$('doneCard').classList.remove('hidden');$('doneSummary').innerHTML=esc(d.message);btn.disabled=false;btn.textContent='Download All';fetch('/api/music/library/refresh',{method:'POST'});setTimeout(()=>loadLibrary(),1000)}
       }catch(_){}}
       read();
     })}
     read();
-  }catch(e){showErr('errorBox','Batch download failed');btn.disabled=false;btn.textContent='📥 Download All'}
+  }catch(e){showErr('errorBox','Batch download failed');btn.disabled=false;btn.textContent='Download All'}
 }
-
 function updateDlItem(prefix,data){
   const list=$(prefix==='dl'?'downloadList':'importList');let item=$(prefix+'-'+data.current);
-  if(!item){item=document.createElement('div');item.id=prefix+'-'+data.current;item.className='download-item';list.appendChild(item)}
-  const icons={downloading:'<span class="spinner"></span>',done:'<span class="status-icon status-done">✓</span>',error:'<span class="status-icon status-error">✗</span>',importing:'<span class="spinner"></span>'};
-  const cls=data.status==='error'?'color:#f87171':'';
-  item.innerHTML=icons[data.status||'downloading']+'<span class="download-title" style="'+cls+'">'+esc(data.title)+'</span>';
-  item.scrollIntoView({behavior:'smooth',block:'end'})
+  if(!item){item=document.createElement('div');item.id=prefix+'-'+data.current;item.className='status-item';list.appendChild(item)}
+  const icons={downloading:'<span class="spinner"></span>',done:'<span class="status-icon done">✓</span>',error:'<span class="status-icon error">✗</span>',importing:'<span class="spinner"></span>',searching:'🔍'};
+  const cls=data.status==='error'?'color:var(--accent)':'';
+  item.innerHTML=(icons[data.status]||'<span class="spinner"></span>')+`<span style="${cls}">${esc(data.title)}</span>`;
+  item.scrollIntoView({behavior:'smooth',block:'end'});
 }
 
-// ═══════════ SEARCH TAB ═══════════
+// ═══════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════
 let selectedSongId=null,selectedSongTitle='';
 async function searchSongs(){
   const q=$('searchQuery').value.trim();if(!q)return;
-  const btn=$('searchBtn');btn.disabled=true;btn.textContent='⏳...';
+  const btn=$('searchBtn');btn.disabled=true;btn.textContent='...';
   hideErr('searchErrorBox');$('searchResults').classList.add('hidden');$('addToPlaylistCard').classList.add('hidden');
   try{
     const r=await fetch('/api/search?q='+encodeURIComponent(q));const d=await r.json();
     if(!r.ok){showErr('searchErrorBox',d.error);return}
     const c=$('searchResultsList');c.innerHTML='';
-    if(!d.results.length){c.innerHTML='<p style="color:#7a78a0;text-align:center;padding:16px">No results.</p>'}
+    if(!d.results.length){c.innerHTML='<div class="empty-state"><p>No results.</p></div>'}
     else d.results.forEach(r=>{
-      const it=document.createElement('div');it.className='download-item';it.style.cssText='cursor:pointer;padding:10px;border-radius:8px;transition:background .15s';
-      it.onmouseenter=()=>it.style.background='rgba(255,255,255,.06)';it.onmouseleave=()=>it.style.background='transparent';
-      it.innerHTML='<span class="track-num" style="min-width:20px">'+r.index+'.</span>'
-        +(r.thumbnail?'<img src="'+esc(r.thumbnail)+'" style="width:44px;height:33px;border-radius:4px;object-fit:cover"/>':'<span style="width:44px;text-align:center">🎵</span>')
-        +'<span class="download-title"><div style="font-weight:500">'+esc(r.title)+'</div><div style="font-size:.75rem;color:#7a78a0">'+esc(r.channel)+(r.duration?' · '+fmtDur(r.duration):'')+'</div></span>'
-        +'<button class="btn-green btn-sm" onclick="event.stopPropagation();selectSong(\''+r.id+'\',\''+escA(r.title)+'\')">➕</button>';
-      c.appendChild(it)
+      const it=document.createElement('div');it.className='song-row';
+      it.innerHTML=`<img class="song-row-art" src="${r.thumbnail||''}" onerror="this.style.display='none'" alt="">
+        <div class="song-row-info"><div class="song-row-title">${esc(r.title)}</div><div class="song-row-artist">${esc(r.channel)}${r.duration?' · '+fmtDur(r.duration):''}</div></div>
+        <div class="song-row-actions"><button class="icon-btn" onclick="event.stopPropagation();selectSong('${r.id}','${escA(r.title)}')"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg></button></div>`;
+      c.appendChild(it);
     });
     $('searchResults').classList.remove('hidden');
-  }catch(e){showErr('searchErrorBox','Connection error')}finally{btn.disabled=false;btn.textContent='🔍 Search'}
+  }catch(e){showErr('searchErrorBox','Connection error')}finally{btn.disabled=false;btn.textContent='Search'}
 }
 function selectSong(id,title){selectedSongId=id;selectedSongTitle=title;$('selectedSongTitle').textContent=title;$('addToPlaylistCard').classList.remove('hidden');$('songDownloadStatus').innerHTML='';$('newPlaylistName').value='';$('playlistSelect').value='';loadSearchPlaylistOptions();loadRelated(id)}
 function cancelAddToPlaylist(){$('addToPlaylistCard').classList.add('hidden');selectedSongId=null}
@@ -489,99 +849,224 @@ async function downloadSelectedSong(){
   try{
     const r=await fetch('/api/download-song',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoUrl:'https://www.youtube.com/watch?v='+selectedSongId,playlistName:name,format:$('dlFormat').value,quality:$('dlQuality').value})});
     const d=await r.json();
-    if(!r.ok)st.innerHTML='<span style="color:#f87171">✗ '+esc(d.error)+'</span>';
-    else{st.innerHTML='<span style="color:#34d399">✓ Downloaded to "'+esc(name)+'"</span>';loadSearchPlaylistOptions()}
-  }catch(e){st.innerHTML='<span style="color:#f87171">✗ Failed</span>'}finally{btn.disabled=false}
+    if(!r.ok)st.innerHTML=`<span style="color:var(--accent)">✗ ${esc(d.error)}</span>`;
+    else{st.innerHTML=`<span style="color:#34c759">✓ Downloaded to "${esc(name)}"</span>`;loadSearchPlaylistOptions();fetch('/api/music/library/refresh',{method:'POST'});setTimeout(()=>loadLibrary(),1000)}
+  }catch(e){st.innerHTML='<span style="color:var(--accent)">✗ Failed</span>'}finally{btn.disabled=false}
 }
-// Feature 6: Related Songs
 async function loadRelated(videoId){
   $('relatedCard').classList.add('hidden');
   try{const r=await fetch('/api/related/'+videoId);const d=await r.json();
   if(!d.results||!d.results.length)return;
   const c=$('relatedList');c.innerHTML='';
   d.results.forEach(s=>{
-    const it=document.createElement('div');it.className='download-item';it.style.cssText='padding:8px 0';
-    it.innerHTML='<span class="track-num" style="min-width:20px">'+s.index+'.</span><span class="download-title">'+esc(s.title)+(s.channel?' <span style="color:#7a78a0;font-size:.75rem">'+esc(s.channel)+'</span>':'')+'</span><button class="btn-green btn-sm" onclick="selectSong(\''+s.id+'\',\''+escA(s.title)+'\')">➕</button>';
-    c.appendChild(it)
+    const it=document.createElement('div');it.className='song-row';
+    it.innerHTML=`<div class="song-row-info"><div class="song-row-title">${esc(s.title)}</div><div class="song-row-artist">${esc(s.channel||'')}</div></div><div class="song-row-actions"><button class="icon-btn" onclick="selectSong('${s.id}','${escA(s.title)}')"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg></button></div>`;
+    c.appendChild(it);
   });$('relatedCard').classList.remove('hidden')}catch(_){}
 }
 
-// ═══════════ LIBRARY TAB ═══════════
+// ═══════════════════════════════════════════
+// LIBRARY
+// ═══════════════════════════════════════════
+let currentLibTab='songs';
+function switchLibTab(tab){
+  currentLibTab=tab;
+  document.querySelectorAll('.lib-subtab').forEach(t=>t.classList.toggle('active',t.textContent.toLowerCase()===tab));
+  document.querySelectorAll('.lib-content').forEach(c=>c.classList.add('hidden'));
+  $('libContent-'+tab).classList.remove('hidden');
+}
 async function loadLibrary(){
   try{
+    // Load music library from new API
+    const musicResp=await fetch('/api/music/library');
+    let musicData={songs:[],artists:[],albums:[]};
+    if(musicResp.ok)musicData=await musicResp.json();
+
+    // Also load legacy playlist data
     const r=await fetch('/api/downloaded-playlists');const d=await r.json();
-    $('libStatTotal').innerHTML='📁 '+d.totalPlaylists+' playlists · 🎵 '+d.totalFiles+' files';
+    $('libStats').innerHTML=`${d.totalPlaylists} playlists · ${d.totalFiles} files · ${musicData.songs?musicData.songs.length:0} songs with metadata`;
+
+    musicLibrary=musicData;
+
+    // Songs tab
+    renderSongs(musicData.songs||[]);
+    // Artists tab
+    renderArtists(musicData.artists||[]);
+    // Albums tab
+    renderAlbums(musicData.albums||[]);
+    // Playlists tab (legacy)
+    renderPlaylists(d.playlists||[]);
+
     // Duplicates
     if(d.duplicates&&d.duplicates.length){
       $('dupCard').classList.remove('hidden');const dl=$('dupList');dl.innerHTML='';
       d.duplicates.forEach(dup=>{
         const g=document.createElement('div');g.className='dup-group';
-        g.innerHTML='<div style="font-weight:600;margin-bottom:6px;font-size:.9rem">🔁 '+esc(dup.files[0].displayName)+' ('+dup.files.length+' copies)</div>';
+        g.innerHTML=`<div style="font-weight:600;margin-bottom:4px;font-size:.85rem">${esc(dup.files[0].displayName)} (${dup.files.length} copies)</div>`;
         dup.files.forEach(f=>{const row=document.createElement('div');row.className='dup-file';
-          row.innerHTML='<span>📁 '+esc(f.playlist)+'</span><button class="btn-red btn-sm" onclick="removeDuplicate(\''+escA(f.playlist)+'\',\''+escA(f.name)+'\',this)">🗑</button>';g.appendChild(row)});
-        dl.appendChild(g)
-      })
+          row.innerHTML=`<span>${esc(f.playlist)}</span><button class="btn btn-red btn-sm" style="padding:3px 8px;font-size:.7rem" onclick="removeDuplicate('${escA(f.playlist)}','${escA(f.name)}',this)">Delete</button>`;
+          g.appendChild(row)});
+        dl.appendChild(g);
+      });
     }else $('dupCard').classList.add('hidden');
-    // Playlists
-    const c=$('libraryContent');c.innerHTML='';
-    d.playlists.forEach(p=>{
-      const card=document.createElement('div');card.className='card';
-      let tracksHtml='<div style="max-height:200px;overflow-y:auto">';
-      p.tracks.forEach(t=>{tracksHtml+='<div class="download-item"><span class="track-num" style="min-width:20px;font-size:.75rem">🎵</span><span class="download-title" style="font-size:.8rem">'+esc(t.displayName)+'</span><span style="color:#7a78a0;font-size:.7rem">'+fmtSize(t.size)+' '+t.ext+'</span><button class="btn-secondary btn-sm" style="padding:4px 8px;font-size:.7rem" onclick="editMeta(\''+escA(p.name)+'\',\''+escA(t.name)+'\')">✏️</button></div>'});
-      tracksHtml+='</div>';
-      card.innerHTML='<div class="card-title">📁 '+esc(p.name)+' <span class="badge badge-blue">'+p.trackCount+' tracks</span></div>'+tracksHtml;
-      c.appendChild(card)
-    });
+
     loadSmartPlaylists();
+
+    // Update recent
+    if(musicData.songs&&musicData.songs.length){
+      $('recentSection').classList.remove('hidden');
+      const recent=$('recentList');recent.innerHTML='';
+      musicData.songs.slice(0,5).forEach(s=>{recent.appendChild(createSongRow(s))});
+    }
   }catch(e){showErr('libErrorBox','Failed to load library')}
 }
+function createSongRow(song,idx,allSongs){
+  const div=document.createElement('div');div.className='song-row';
+  const offlineIndicator=async()=>{
+    const off=await isSongOffline(song.id);
+    if(off){const badge=document.createElement('div');badge.className='song-row-offline';div.appendChild(badge)}
+  };
+  offlineIndicator();
+
+  const coverImg=`<img class="song-row-art" src="${song.coverUrl||''}" onerror="this.className='song-row-art placeholder';this.src=''" alt="">`;
+  div.innerHTML=`${coverImg}<div class="song-row-info" style="cursor:pointer"><div class="song-row-title">${esc(song.title)}</div><div class="song-row-artist">${esc(song.artist)}${song.album?' · '+esc(song.album):''}</div></div><div class="song-row-duration">${fmtDur(song.duration)}</div><div class="song-row-actions">
+    <button class="icon-btn" title="Play" onclick="event.stopPropagation();playFromList(${idx!==undefined?idx:0})"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+    <button class="icon-btn offline-dl-btn" title="Download for Offline" onclick="event.stopPropagation();toggleOffline(this,'${song.id}')"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button>
+    <button class="icon-btn" title="Edit Metadata" onclick="event.stopPropagation();editMeta('${escA(song.playlist)}','${escA(song.file)}')"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button></div>`;
+
+  // Click the info area to play
+  div.querySelector('.song-row-info').onclick=()=>{
+    const list=allSongs||musicLibrary.songs||[];
+    const i=idx!==undefined?idx:list.findIndex(s=>s.id===song.id);
+    if(list.length)playLibrary(list,i>=0?i:0);
+  };
+  return div;
+}
+function renderSongs(songs){
+  const c=$('libContent-songs');c.innerHTML='';
+  if(!songs.length){c.innerHTML='<div class="empty-state"><div class="icon">🎵</div><p>No songs yet. Download some music!</p></div>';return}
+  songs.forEach((s,i)=>c.appendChild(createSongRow(s,i,songs)));
+  // Mark offline buttons
+  updateOfflineButtons();
+}
+async function updateOfflineButtons(){
+  const songs=await getAllOfflineSongs();
+  const ids=new Set(songs.map(s=>s.id));
+  document.querySelectorAll('.offline-dl-btn').forEach(btn=>{
+    // Check by proximity to song row
+    const row=btn.closest('.song-row');
+    if(!row)return;
+  });
+}
+async function toggleOffline(btn,songId){
+  if(await isSongOffline(songId)){
+    await removeOfflineSong(songId);
+    btn.style.color='';btn.title='Download for Offline';
+  }else{
+    btn.innerHTML='<span class="spinner"></span>';
+    const song=musicLibrary.songs.find(s=>s.id===songId);
+    if(song)await downloadForOffline(song);
+    btn.innerHTML='<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
+    btn.style.color='#34c759';btn.title='Remove Offline';
+  }
+}
+function renderArtists(artists){
+  const c=$('libContent-artists');c.innerHTML='';
+  if(!artists.length){c.innerHTML='<div class="empty-state"><div class="icon">🎤</div><p>No artists yet</p></div>';return}
+  artists.sort((a,b)=>a.name.localeCompare(b.name));
+  artists.forEach(a=>{
+    const div=document.createElement('div');
+    div.className='playlist-item';div.style.cursor='pointer';
+    div.innerHTML=`<div style="width:44px;height:44px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">🎤</div>
+      <div class="playlist-item-info"><div class="playlist-item-name">${esc(a.name)}</div><div class="playlist-item-meta">${a.songs.length} songs</div></div>`;
+    div.onclick=()=>{
+      // Show artist's songs in songs tab
+      renderSongs(a.songs);
+      switchLibTab('songs');
+    };
+    c.appendChild(div);
+  });
+}
+function renderAlbums(albums){
+  const c=$('libContent-albums');c.innerHTML='';
+  if(!albums.length){c.innerHTML='<div class="empty-state"><div class="icon">💿</div><p>No albums yet</p></div>';return}
+  const grid=document.createElement('div');grid.className='album-grid';
+  albums.filter(a=>a.name!=='Unknown Album').forEach(a=>{
+    const card=document.createElement('div');card.className='album-card';
+    const coverUrl=a.songs[0]?a.songs[0].coverUrl:'';
+    card.innerHTML=`<img src="${coverUrl}" onerror="this.style.background='var(--bg4)'" alt="${esc(a.name)}"><div class="album-card-title">${esc(a.name)}</div><div class="album-card-sub">${esc(a.artist)} · ${a.songs.length} songs</div>`;
+    card.onclick=()=>{renderSongs(a.songs);switchLibTab('songs')};
+    grid.appendChild(card);
+  });
+  c.appendChild(grid);
+}
+function renderPlaylists(playlists){
+  const c=$('libContent-playlists');c.innerHTML='';
+  if(!playlists.length){c.innerHTML='<div class="empty-state"><div class="icon">📁</div><p>No playlists yet</p></div>';return}
+  playlists.forEach(p=>{
+    const div=document.createElement('div');div.className='playlist-item';
+    let tracksHtml=p.tracks.map(t=>`<div style="font-size:.75rem;color:var(--text2);padding:2px 0">${esc(t.displayName)}</div>`).join('');
+    div.innerHTML=`<div class="playlist-item-info"><div class="playlist-item-name">${esc(p.name)}</div><div class="playlist-item-meta">${p.trackCount} tracks</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="playPlaylistLegacy('${escA(p.name)}')">Play</button>`;
+    c.appendChild(div);
+  });
+}
+async function playPlaylistLegacy(name){
+  // Play songs from a playlist folder
+  const songs=musicLibrary.songs.filter(s=>s.playlist===name);
+  if(songs.length)playLibrary(songs,0);
+  else alert('No playable songs found in this playlist');
+}
+function playFromList(idx){if(musicLibrary.songs.length)playLibrary(musicLibrary.songs,idx)}
+
 async function searchLibrary(){
   const q=$('libSearchInput').value.trim();if(!q){loadLibrary();return}
-  try{const r=await fetch('/api/library/search?q='+encodeURIComponent(q));const d=await r.json();
-  const c=$('libraryContent');c.innerHTML='';
-  if(!d.results.length){c.innerHTML='<div class="empty-state"><div class="icon">🔍</div><p>No results</p></div>';return}
-  d.results.forEach(f=>{const card=document.createElement('div');card.className='card';
-    card.innerHTML='<div class="download-item"><span>🎵</span><span class="download-title">'+esc(f.displayName)+'</span><span class="badge badge-blue">'+esc(f.playlist)+'</span><span style="color:#7a78a0;font-size:.75rem">'+fmtSize(f.size)+'</span></div>';
-    c.appendChild(card)})
+  try{
+    // Search in music library
+    const r=await fetch('/api/music/library');const d=await r.json();
+    const filtered=(d.songs||[]).filter(s=>s.title.toLowerCase().includes(q.toLowerCase())||s.artist.toLowerCase().includes(q.toLowerCase())||s.album.toLowerCase().includes(q.toLowerCase()));
+    renderSongs(filtered);
+    switchLibTab('songs');
   }catch(_){}
 }
-// Feature 4: Metadata Editor
+
+// Metadata editor
 let metaFile=null,metaPlaylist=null;
 async function editMeta(playlist,file){
-  metaFile=file;metaPlaylist=playlist;$('metaModal').classList.remove('hidden');$('metaStatus').innerHTML='<span class="spinner"></span> Loading...';
+  metaFile=file;metaPlaylist=playlist;$('metaModal').classList.add('open');$('metaStatus').innerHTML='<span class="spinner"></span> Loading...';
   try{const r=await fetch('/api/file-metadata?playlist='+encodeURIComponent(playlist)+'&file='+encodeURIComponent(file));const d=await r.json();
     $('metaTitle').value=d.title||'';$('metaArtist').value=d.artist||'';$('metaAlbum').value=d.album||'';$('metaGenre').value=d.genre||'';$('metaDate').value=d.date||'';
-    $('metaStatus').innerHTML=''
-  }catch(e){$('metaStatus').innerHTML='<span style="color:#f87171">Failed to load metadata</span>'}
+    $('metaStatus').innerHTML='';
+  }catch(e){$('metaStatus').innerHTML='<span style="color:var(--accent)">Failed to load</span>'}
 }
-function closeMetaEditor(){$('metaModal').classList.add('hidden')}
+function closeMetaEditor(){$('metaModal').classList.remove('open')}
 async function saveMetadata(){
   const btn=$('metaSaveBtn');btn.disabled=true;$('metaStatus').innerHTML='<span class="spinner"></span> Saving...';
   try{const r=await fetch('/api/file-metadata',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({playlist:metaPlaylist,file:metaFile,title:$('metaTitle').value,artist:$('metaArtist').value,album:$('metaAlbum').value,genre:$('metaGenre').value,date:$('metaDate').value})});
     const d=await r.json();if(!r.ok)throw new Error(d.error);
-    $('metaStatus').innerHTML='<span style="color:#34d399">✓ Saved!</span>';setTimeout(()=>closeMetaEditor(),1000);
-  }catch(e){$('metaStatus').innerHTML='<span style="color:#f87171">'+esc(e.message)+'</span>'}finally{btn.disabled=false}
+    $('metaStatus').innerHTML='<span style="color:#34c759">✓ Saved!</span>';setTimeout(()=>{closeMetaEditor();loadLibrary()},800);
+  }catch(e){$('metaStatus').innerHTML=`<span style="color:var(--accent)">${esc(e.message)}</span>`}finally{btn.disabled=false}
 }
-// Feature 14: Remove duplicate
 async function removeDuplicate(playlist,file,btn){
   btn.disabled=true;btn.textContent='...';
   try{await fetch('/api/duplicates/remove',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({playlist,file})});
     btn.closest('.dup-file').remove();loadLibrary();
-  }catch(_){btn.textContent='🗑';btn.disabled=false}
+  }catch(_){btn.textContent='Delete';btn.disabled=false}
 }
-// Feature 13: Smart Playlists
+
+// Smart playlists
 async function loadSmartPlaylists(){
   try{const r=await fetch('/api/smart-playlists');const d=await r.json();
   const c=$('smartPlaylistList');
-  if(!d.smartPlaylists.length){c.innerHTML='<p style="color:#7a78a0;font-size:.8rem">No smart playlists yet.</p>';return}
+  if(!d.smartPlaylists.length){c.innerHTML='<p style="color:var(--text3);font-size:.82rem">No smart playlists yet.</p>';return}
   c.innerHTML='';d.smartPlaylists.forEach(sp=>{
     const div=document.createElement('div');div.className='playlist-item';
-    div.innerHTML='<div class="playlist-info"><div class="playlist-name">🧠 '+esc(sp.name)+'</div><div class="playlist-meta">Created '+new Date(sp.createdAt).toLocaleDateString()+'</div></div><div class="playlist-actions"><button class="btn-primary btn-sm" onclick="resolveSmart(\''+sp.id+'\')">▶ View</button><button class="btn-red btn-sm" onclick="deleteSmart(\''+sp.id+'\')">🗑</button></div>';
-    c.appendChild(div)
+    div.innerHTML=`<div class="playlist-item-info"><div class="playlist-item-name">${esc(sp.name)}</div><div class="playlist-item-meta">Created ${new Date(sp.createdAt).toLocaleDateString()}</div></div><div style="display:flex;gap:6px"><button class="btn btn-accent btn-sm" onclick="resolveSmart('${sp.id}')">View</button><button class="btn btn-red btn-sm" style="padding:6px 10px" onclick="deleteSmart('${sp.id}')">Delete</button></div>`;
+    c.appendChild(div);
   })}catch(_){}
 }
-function showCreateSmart(){$('smartModal').classList.remove('hidden')}
-function closeSmartModal(){$('smartModal').classList.add('hidden')}
+function showCreateSmart(){$('smartModal').classList.add('open')}
+function closeSmartModal(){$('smartModal').classList.remove('open')}
 async function createSmartPlaylist(){
   const name=$('smartName').value.trim();if(!name)return;
   const rules={sort:$('smartSort').value,format:$('smartFormat').value,limit:parseInt($('smartLimit').value)||50};
@@ -591,18 +1076,24 @@ async function createSmartPlaylist(){
 }
 async function resolveSmart(id){
   try{const r=await fetch('/api/smart-playlists/'+id+'/resolve');const d=await r.json();
-  const c=$('libraryContent');c.innerHTML='<div class="card"><div class="card-title">🧠 '+esc(d.name)+' ('+d.total+' tracks)</div><div style="max-height:300px;overflow-y:auto">';
-  d.tracks.forEach(t=>{c.innerHTML+='<div class="download-item"><span>🎵</span><span class="download-title">'+esc(t.displayName)+'</span><span class="badge badge-blue">'+esc(t.playlist)+'</span><span style="color:#7a78a0;font-size:.7rem">'+fmtSize(t.size)+'</span></div>'});
-  c.innerHTML+='</div></div>'}catch(_){}
+    const songs=d.tracks?d.tracks.map(t=>({
+      id:t.file?t.playlist+'/'+t.file:Math.random().toString(),
+      title:t.displayName||'Unknown',artist:t.playlist||'Unknown',album:'',duration:0,
+      playlist:t.playlist,file:t.name||t.file,coverUrl:`/api/music/cover/${encodeURIComponent(t.playlist)}/${encodeURIComponent(t.name||t.file)}`
+    })):[];
+    renderSongs(songs);switchLibTab('songs');
+  }catch(_){}
 }
 async function deleteSmart(id){try{await fetch('/api/smart-playlists/'+id,{method:'DELETE'});loadSmartPlaylists()}catch(_){}}
 
-// ═══════════ DISCOVER TAB ═══════════
+// ═══════════════════════════════════════════
+// DISCOVER / BROWSE
+// ═══════════════════════════════════════════
 let currentChartTracks=[];
 async function loadCharts(){
   try{const r=await fetch('/api/charts');const d=await r.json();
   const c=$('chartsList');c.innerHTML='';
-  d.charts.forEach(ch=>{const chip=document.createElement('span');chip.className='chip';chip.textContent=ch.name;chip.onclick=()=>loadChartTracks(ch.id,ch.name);c.appendChild(chip)})
+  d.charts.forEach(ch=>{const chip=document.createElement('span');chip.className='chip';chip.textContent=ch.name;chip.onclick=()=>loadChartTracks(ch.id,ch.name);c.appendChild(chip)});
   }catch(_){$('chartsList').innerHTML='Failed to load charts'}
 }
 async function loadChartTracks(id,name){
@@ -610,79 +1101,109 @@ async function loadChartTracks(id,name){
   try{const r=await fetch('/api/charts/'+id);const d=await r.json();
   currentChartTracks=d.tracks||[];const c=$('chartTrackList');c.innerHTML='';
   d.tracks.forEach(t=>{
-    const it=document.createElement('div');it.className='download-item';it.style.padding='8px 4px';
-    it.innerHTML='<span class="track-num" style="min-width:20px">'+t.index+'.</span><span class="download-title"><div>'+esc(t.title)+'</div><div style="font-size:.75rem;color:#7a78a0">'+esc(t.channel||'')+'</div></span><button class="btn-green btn-sm" style="padding:4px 10px;font-size:.7rem" onclick="quickAddSong(\''+t.id+'\',\''+escA(t.title)+'\')">➕</button>';
-    c.appendChild(it)
+    const it=document.createElement('div');it.className='song-row';
+    it.innerHTML=`<span style="color:var(--text3);font-size:.78rem;min-width:20px">${t.index}.</span><div class="song-row-info"><div class="song-row-title">${esc(t.title)}</div><div class="song-row-artist">${esc(t.channel||'')}</div></div><div class="song-row-actions"><button class="icon-btn" onclick="quickAddSong('${t.id}','${escA(t.title)}')"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg></button></div>`;
+    c.appendChild(it);
   })}catch(_){$('chartTrackList').innerHTML='Failed to load'}
 }
-function quickAddSong(id,title){selectedSongId=id;selectedSongTitle=title;$('selectedSongTitle').textContent=title;switchTab('search');$('addToPlaylistCard').classList.remove('hidden');$('songDownloadStatus').innerHTML='';loadSearchPlaylistOptions()}
+function quickAddSong(id,title){selectedSongId=id;selectedSongTitle=title;$('selectedSongTitle').textContent=title;switchPage('search');$('addToPlaylistCard').classList.remove('hidden');$('songDownloadStatus').innerHTML='';loadSearchPlaylistOptions()}
 async function downloadChart(){
   if(!currentChartTracks.length)return;
   const name=$('chartTitle').textContent;
-  const btn=$('chartDlBtn');btn.disabled=true;btn.textContent='⏳ Downloading...';
+  const btn=$('chartDlBtn');btn.disabled=true;btn.textContent='Downloading...';
   let done=0;const total=currentChartTracks.length;
   for(const t of currentChartTracks){
     try{await fetch('/api/download-song',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoUrl:'https://www.youtube.com/watch?v='+t.id,playlistName:name})})}catch(_){}
     done++;btn.textContent=Math.round(done/total*100)+'%';
   }
-  btn.textContent='✅ Done';btn.disabled=false;
+  btn.textContent='Done!';btn.disabled=false;fetch('/api/music/library/refresh',{method:'POST'});setTimeout(()=>loadLibrary(),1000);
 }
-// Feature 8: Artist
 async function searchArtist(){
   const q=$('artistQuery').value.trim();if(!q)return;
   $('artistResults').classList.remove('hidden');$('artistResultsList').innerHTML='<span class="spinner"></span> Searching...';
   try{const r=await fetch('/api/artist?query='+encodeURIComponent(q));const d=await r.json();
   const c=$('artistResultsList');c.innerHTML='';
-  if(!d.results.length){c.innerHTML='<p style="color:#7a78a0;padding:16px;text-align:center">No results.</p>';return}
+  if(!d.results.length){c.innerHTML='<div class="empty-state"><p>No results.</p></div>';return}
   d.results.forEach(s=>{
-    const it=document.createElement('div');it.className='download-item';it.style.padding='8px 4px';
-    it.innerHTML='<span class="track-num" style="min-width:20px">'+s.index+'.</span><span class="download-title"><div>'+esc(s.title)+'</div><div style="font-size:.75rem;color:#7a78a0">'+esc(s.channel||'')+'</div></span><button class="btn-green btn-sm" style="padding:4px 10px;font-size:.7rem" onclick="quickAddSong(\''+s.id+'\',\''+escA(s.title)+'\')">➕</button>';
-    c.appendChild(it)
+    const it=document.createElement('div');it.className='song-row';
+    it.innerHTML=`<span style="color:var(--text3);font-size:.78rem;min-width:20px">${s.index}.</span><div class="song-row-info"><div class="song-row-title">${esc(s.title)}</div><div class="song-row-artist">${esc(s.channel||'')}</div></div><div class="song-row-actions"><button class="icon-btn" onclick="quickAddSong('${s.id}','${escA(s.title)}')"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg></button></div>`;
+    c.appendChild(it);
   })}catch(_){$('artistResultsList').innerHTML='Failed'}
 }
 
-// ═══════════ TOOLS TAB ═══════════
-// Feature 2: Spotify
+// Suggested
+let suggestedTracks=[];
+async function loadSuggested(){
+  const btn=$('suggestBtn');btn.disabled=true;btn.textContent='Analyzing...';
+  $('suggestedResults').classList.add('hidden');$('suggestedInfo').innerHTML='';
+  try{const r=await fetch('/api/suggested');const d=await r.json();
+    if(!d.suggestions.length){$('suggestedInfo').innerHTML='<span style="color:#ffcc00">No suggestions. Add more songs first!</span>';return}
+    $('suggestedInfo').innerHTML=`<span style="color:var(--text2);font-size:.78rem">Based on ${d.totalLibrary} songs${d.sampled.length?' · Seeded from: '+d.sampled.map(s=>esc(s)).join(', '):''}</span>`;
+    suggestedTracks=d.suggestions;
+    const c=$('suggestedList');c.innerHTML='';
+    d.suggestions.forEach((s,i)=>{
+      const it=document.createElement('div');it.className='song-row';
+      it.innerHTML=`<span style="color:var(--text3);font-size:.78rem;min-width:20px">${i+1}.</span><div class="song-row-info"><div class="song-row-title">${esc(s.title)}</div><div class="song-row-artist">${esc(s.channel||'')}${s.seededFrom?' · via '+esc(s.seededFrom):''}</div></div><div class="song-row-actions"><button class="icon-btn" onclick="quickAddSong('${s.id}','${escA(s.title)}')"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg></button></div>`;
+      c.appendChild(it);
+    });
+    $('suggestPlaylistName').value='Discover Mix';
+    $('suggestedResults').classList.remove('hidden');
+  }catch(e){$('suggestedInfo').innerHTML='<span style="color:var(--accent)">Failed</span>'}finally{btn.disabled=false;btn.textContent='Discover New Music'}
+}
+async function downloadAllSuggested(){
+  if(!suggestedTracks.length)return;
+  const name=$('suggestPlaylistName').value.trim()||'Discover Mix';
+  const btn=$('suggestDlAllBtn');btn.disabled=true;btn.textContent='0%';
+  let done=0;const total=suggestedTracks.length;
+  for(const t of suggestedTracks){
+    try{await fetch('/api/download-song',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoUrl:'https://www.youtube.com/watch?v='+t.id,playlistName:name,format:$('dlFormat').value,quality:$('dlQuality').value})})}catch(_){}
+    done++;btn.textContent=Math.round(done/total*100)+'%';
+  }
+  btn.textContent=done+' downloaded!';btn.disabled=false;fetch('/api/music/library/refresh',{method:'POST'});setTimeout(()=>loadLibrary(),1000);
+}
+
+// ═══════════════════════════════════════════
+// TOOLS
+// ═══════════════════════════════════════════
 async function loadSpotifyPlaylist(){
   const url=$('spotifyUrl').value.trim();if(!url)return;
-  const btn=$('spotifyBtn');btn.disabled=true;btn.textContent='⏳...';
-  $('spotifyResults').classList.remove('hidden');
-  $('spotifyResults').innerHTML='<span class="spinner"></span> Loading from Spotify...';
+  const btn=$('spotifyBtn');btn.disabled=true;btn.textContent='Loading...';
+  $('spotifyResults').classList.remove('hidden');$('spotifyResults').innerHTML='<span class="spinner"></span> Loading from Spotify...';
   try{const r=await fetch('/api/spotify-playlist?url='+encodeURIComponent(url));const d=await r.json();
-  if(!r.ok){$('spotifyResults').innerHTML='<div class="error-box">'+esc(d.error)+'</div>';return}
-  let html='<p style="color:#a5a3c9;font-size:.85rem;margin-bottom:8px">Found '+d.count+' tracks: "'+esc(d.title)+'"</p>';
-  html+='<div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" id="spotifyPlaylistName" value="'+escA(d.title)+'" style="flex:1" /><button class="btn-green btn-sm" onclick="downloadSpotifyAsPlaylist()">⬇️ Download All</button></div>';
-  html+='<div style="max-height:250px;overflow-y:auto">';
-  d.tracks.forEach(t=>{html+='<div class="download-item"><span class="track-num" style="min-width:20px">'+t.index+'.</span><span class="download-title">'+esc(t.title)+(t.artist?' <span style="color:#7a78a0;font-size:.75rem">'+esc(t.artist)+'</span>':'')+'</span></div>'});
-  html+='</div>';$('spotifyResults').innerHTML=html;
-  }catch(e){$('spotifyResults').innerHTML='<div class="error-box">Failed. yt-dlp may not support Spotify directly.</div>'}finally{btn.disabled=false;btn.textContent='Load'}
+    if(!r.ok){$('spotifyResults').innerHTML=`<div class="error-box">${esc(d.error)}</div>`;return}
+    let html=`<p style="color:var(--text2);font-size:.82rem;margin-bottom:8px">Found ${d.count} tracks: "${esc(d.title)}"</p>`;
+    html+=`<div class="input-row" style="margin-bottom:10px"><input type="text" id="spotifyPlaylistName" class="input-field" value="${escA(d.title)}"><button class="btn btn-green btn-sm" onclick="downloadSpotifyAsPlaylist()">Download All</button></div>`;
+    html+='<div style="max-height:200px;overflow-y:auto">';
+    d.tracks.forEach(t=>{html+=`<div class="song-row"><div class="song-row-info"><div class="song-row-title">${esc(t.title)}</div><div class="song-row-artist">${esc(t.artist||'')}</div></div></div>`});
+    html+='</div>';$('spotifyResults').innerHTML=html;
+  }catch(e){$('spotifyResults').innerHTML='<div class="error-box">Failed</div>'}finally{btn.disabled=false;btn.textContent='Load'}
 }
 async function downloadSpotifyAsPlaylist(){
   const url=$('spotifyUrl').value.trim();if(!url)return;
   const name=$('spotifyPlaylistName')?$('spotifyPlaylistName').value.trim():'';
   if(!name){alert('Enter a playlist name');return}
-  const fmt=$('dlFormat').value;const q=$('dlQuality').value;
+  const fmt=$('dlFormat').value,q=$('dlQuality').value;
   $('spotifyStatusSection').classList.remove('hidden');
   $('spotifyProgressBar').style.width='0%';
-  $('spotifyProgressText').textContent='Starting Spotify download...';
+  $('spotifyProgressText').textContent='Starting...';
   $('spotifyDownloadList').innerHTML='';
   const es=new EventSource('/api/spotify-download?url='+encodeURIComponent(url)+'&format='+fmt+'&quality='+q);
   es.addEventListener('playlist',e=>{const d=JSON.parse(e.data);$('spotifyProgressText').textContent='0 / '+d.total+' tracks'});
   es.addEventListener('progress',e=>{const d=JSON.parse(e.data);
     if(d.total){const p=Math.round(d.current/d.total*100);$('spotifyProgressBar').style.width=p+'%';
-    $('spotifyProgressText').textContent=d.current+' / '+d.total+(d.status==='searching'?' 🔍 Searching...':d.status==='downloading'?' ⬇️ Downloading...':'')}
-    const icons={searching:'🔍',downloading:'<span class="spinner"></span>',done:'<span class="status-icon status-done">✓</span>',error:'<span class="status-icon status-error">✗</span>'};
+    $('spotifyProgressText').textContent=d.current+' / '+d.total+(d.status==='searching'?' 🔍':' ⬇️')}
+    const icons={searching:'🔍',downloading:'<span class="spinner"></span>',done:'<span class="status-icon done">✓</span>',error:'<span class="status-icon error">✗</span>'};
     let item=document.getElementById('sp-'+d.current);
-    if(!item){item=document.createElement('div');item.id='sp-'+d.current;item.className='download-item';$('spotifyDownloadList').appendChild(item)}
-    const cls=d.status==='error'?'color:#f87171':'';
-    item.innerHTML=(icons[d.status]||'')+'<span class="download-title" style="'+cls+'">'+esc(d.title||'')+'</span>';
+    if(!item){item=document.createElement('div');item.id='sp-'+d.current;item.className='status-item';$('spotifyDownloadList').appendChild(item)}
+    item.innerHTML=(icons[d.status]||'')+`<span style="${d.status==='error'?'color:var(--accent)':''}">${esc(d.title||'')}</span>`;
     item.scrollIntoView({behavior:'smooth',block:'end'});
   });
-  es.addEventListener('error',e=>{const d=JSON.parse(e.data);$('spotifyProgressText').innerHTML='<span style="color:#f87171">'+esc(d.message)+'</span>';es.close()});
-  es.addEventListener('done',e=>{const d=JSON.parse(e.data);$('spotifyProgressText').innerHTML='<span style="color:#34d399">✅ '+esc(d.message)+'</span>';es.close()});
+  es.addEventListener('error',e=>{$('spotifyProgressText').innerHTML=`<span style="color:var(--accent)">${esc(JSON.parse(e.data).message)}</span>`;es.close()});
+  es.addEventListener('done',e=>{const d=JSON.parse(e.data);$('spotifyProgressText').innerHTML=`<span style="color:#34c759">✅ ${esc(d.message)}</span>`;es.close();fetch('/api/music/library/refresh',{method:'POST'});setTimeout(()=>loadLibrary(),1000)});
   es.onerror=()=>{es.close()};
 }
-// Feature 9: Watcher
+
+// Watcher
 async function loadWatcherPlaylists(){
   try{const r=await fetch('/api/downloaded-playlists');const d=await r.json();const s=$('watcherPlaylist');
   s.innerHTML='<option value="">-- Select playlist --</option>';
@@ -690,7 +1211,7 @@ async function loadWatcherPlaylists(){
 }
 async function loadWatcherStatus(){
   try{const r=await fetch('/api/watcher/status');const d=await r.json();
-  if(d.active){$('watcherStatus').innerHTML='<span class="badge badge-green">▶ Active</span> Watching "'+esc(d.playlist)+'"';
+  if(d.active){$('watcherStatus').innerHTML=`<span class="badge badge-green">Active</span> Watching "${esc(d.playlist)}"`;
     $('watcherStartBtn').disabled=true;$('watcherStopBtn').disabled=false}
   }catch(_){}
 }
@@ -698,47 +1219,48 @@ async function startWatcher(){
   const name=$('watcherPlaylist').value;if(!name)return;
   try{const r=await fetch('/api/watcher/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playlistName:name})});
   const d=await r.json();if(!r.ok){$('watcherStatus').innerHTML='<span class="badge badge-red">Error</span>';return}
-  $('watcherStatus').innerHTML='<span class="badge badge-green">▶ Active</span> '+esc(d.message);
+  $('watcherStatus').innerHTML=`<span class="badge badge-green">Active</span> ${esc(d.message)}`;
   $('watcherStartBtn').disabled=true;$('watcherStopBtn').disabled=false;
   }catch(_){}
 }
 async function stopWatcher(){
   try{await fetch('/api/watcher/stop',{method:'POST'});
-  $('watcherStatus').innerHTML='<span class="badge badge-yellow">⏹ Stopped</span>';
+  $('watcherStatus').innerHTML='<span class="badge badge-yellow">Stopped</span>';
   $('watcherStartBtn').disabled=false;$('watcherStopBtn').disabled=true;
   }catch(_){}
 }
-// Feature 11: API Key
+
+// API Key
 async function loadApiKey(){try{const r=await fetch('/api/settings');const d=await r.json();$('apiKeyDisplay').textContent=d.apiKey}catch(_){}}
 function copyApiKey(){navigator.clipboard.writeText($('apiKeyDisplay').textContent);alert('API key copied!')}
 
-// ═══════════ IMPORT TAB ═══════════
+// Import
 let importedSet=new Set();
 async function loadImportPlaylists(){
   const c=$('importListContainer');
   try{const r=await fetch('/api/downloaded-playlists');const d=await r.json();
-  if(!d.playlists.length){c.innerHTML='<div class="empty-state"><div class="icon">📭</div><p>No playlists. Download one first!</p></div>';return}
+  if(!d.playlists.length){c.innerHTML='<div class="empty-state"><div class="icon">📂</div><p>No playlists. Download one first!</p></div>';return}
   c.innerHTML='';d.playlists.forEach(p=>{
     const sid=safeId(p.name);
     const it=document.createElement('div');it.className='playlist-item';it.id='imp-item-'+sid;
-    it.innerHTML='<div class="playlist-info"><div class="playlist-name">📁 '+esc(p.name)+'</div><div class="playlist-meta">'+p.trackCount+' tracks <span id="imp-aminfo-'+sid+'"></span></div></div><div class="playlist-actions"><span id="imp-badge-'+sid+'" class="'+(importedSet.has(p.name)?'badge badge-green':'hidden')+'">'+(importedSet.has(p.name)?'✓ Imported':'')+'</span><button class="btn-green btn-sm" id="imp-btn-'+sid+'" onclick="importPlaylist(\''+escA(p.name)+'\')" '+(importedSet.has(p.name)?'disabled':'')+'>🍎 Import</button></div>';
+    it.innerHTML=`<div class="playlist-item-info"><div class="playlist-item-name">${esc(p.name)}</div><div class="playlist-item-meta">${p.trackCount} tracks <span id="imp-aminfo-${sid}"></span></div></div><div style="display:flex;gap:6px;align-items:center"><span id="imp-badge-${sid}" class="${importedSet.has(p.name)?'badge badge-green':'hidden'}">${importedSet.has(p.name)?'✓ Imported':''}</span><button class="btn btn-green btn-sm" id="imp-btn-${sid}" onclick="importPlaylist('${escA(p.name)}')" ${importedSet.has(p.name)?'disabled':''}>Import</button></div>`;
     c.appendChild(it);
-    checkAppleMusicPlaylist(p.name,sid)
+    checkAppleMusicPlaylist(p.name,sid);
   })}catch(_){c.innerHTML='<div class="error-box">Connection error</div>'}
 }
 async function checkAppleMusicPlaylist(name,sid){
   const el=$('imp-aminfo-'+sid);if(!el)return;
   try{const r=await fetch('/api/apple-music-check?name='+encodeURIComponent(name));const d=await r.json();
-    if(d.exists){el.innerHTML='<span class="badge badge-yellow" style="margin-left:6px">🍎 '+d.trackCount+' in Apple Music (will skip duplicates)</span>'}
-    else{el.innerHTML='<span class="badge badge-green" style="margin-left:6px">🆕 New</span>'}
+    if(d.exists)el.innerHTML=`<span class="badge badge-yellow">${d.trackCount} in Apple Music</span>`;
+    else el.innerHTML='<span class="badge badge-green">New</span>';
   }catch(_){}
 }
 function importPlaylist(name){
   const sid=safeId(name);const btn=$('imp-btn-'+sid);const badge=$('imp-badge-'+sid);
-  btn.disabled=true;btn.textContent='⏳...';badge.className='badge badge-yellow';badge.textContent='Importing...';
-  $('importStatusSection').classList.add('visible');$('importDoneCard').classList.add('hidden');
+  btn.disabled=true;btn.textContent='Importing...';badge.className='badge badge-yellow';badge.textContent='Importing...';
+  $('importStatusSection').classList.remove('hidden');$('importDoneCard').classList.add('hidden');
   $('importList').innerHTML='';$('importProgressBar').style.width='0%';
-  $('importStatusTitle').textContent='🍎 Importing "'+name+'"...';
+  $('importStatusTitle').textContent=`Importing "${name}"...`;
   fetch('/api/import-to-apple-music',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playlistName:name})}).then(r=>{
     const reader=r.body.getReader();const dec=new TextDecoder();let buf='';
     function read(){reader.read().then(({done,value})=>{if(done)return;buf+=dec.decode(value,{stream:true});
@@ -747,90 +1269,75 @@ function importPlaylist(name){
         if(d.total)$('importProgressText').textContent='0 / '+d.total;
         if(d.current){const p=Math.round(d.current/d.total*100);$('importProgressBar').style.width=p+'%';
           const imp=d.imported||0;const errs=d.errors||0;
-          $('importProgressText').textContent=imp+' imported'+(errs?' / '+errs+' failed':'')+' · processing '+d.current+'/'+d.total;
+          $('importProgressText').textContent=imp+' imported'+(errs?' / '+errs+' failed':'')+' · '+d.current+'/'+d.total;
           updateDlItem('imp',d)}
-        if(d.message){$('importStatusTitle').textContent='✅ Done!';$('importDoneCard').classList.remove('hidden');
-          $('importDoneSummary').innerHTML='🎉 '+esc(d.message)+(d.errorFiles&&d.errorFiles.length?'<br><span style="color:#f87171;font-size:.8rem">Failed files: '+d.errorFiles.slice(0,10).map(f=>esc(f)).join(', ')+'</span>':'');
-          btn.textContent='✓ Done';badge.className='badge badge-green';badge.textContent='✓ Imported';importedSet.add(name)}
-      }catch(_){}}read()})}read()
-  }).catch(e=>{btn.disabled=false;btn.textContent='🍎 Import';badge.className='badge badge-red';badge.textContent='Failed'})
+        if(d.message){$('importStatusTitle').textContent='Done!';
+          $('importDoneCard').classList.remove('hidden');
+          $('importDoneSummary').innerHTML=esc(d.message)+(d.errorFiles&&d.errorFiles.length?`<br><span style="color:var(--accent);font-size:.78rem">Failed: ${d.errorFiles.slice(0,10).map(f=>esc(f)).join(', ')}</span>`:'');
+          btn.textContent='Done';badge.className='badge badge-green';badge.textContent='✓ Imported';importedSet.add(name)}
+      }catch(_){}}read()})}read();
+  }).catch(()=>{btn.disabled=false;btn.textContent='Import';badge.className='badge badge-red';badge.textContent='Failed'});
 }
 
-// ═══════════ SUGGESTED FOR YOU ═══════════
-let suggestedTracks=[];
-async function loadSuggested(){
-  const btn=$('suggestBtn');btn.disabled=true;btn.textContent='⏳ Analyzing library...';
-  $('suggestedResults').classList.add('hidden');$('suggestedInfo').innerHTML='';
-  try{const r=await fetch('/api/suggested');const d=await r.json();
-    if(!d.suggestions.length){$('suggestedInfo').innerHTML='<span style="color:#fbbf24">No suggestions found. Try adding more songs first!</span>';return}
-    $('suggestedInfo').innerHTML='<span style="color:#a5a3c9;font-size:.8rem">📚 Based on '+d.totalLibrary+' songs in your library · Seeded from: <em>'+d.sampled.map(s=>esc(s)).join('</em>, <em>')+'</em></span>';
-    suggestedTracks=d.suggestions;
-    const c=$('suggestedList');c.innerHTML='';
-    d.suggestions.forEach((s,i)=>{
-      const it=document.createElement('div');it.className='download-item';it.style.padding='8px 4px';
-      it.innerHTML='<span class="track-num" style="min-width:20px">'+(i+1)+'.</span><span class="download-title"><div>'+esc(s.title)+'</div><div style="font-size:.75rem;color:#7a78a0">'+esc(s.channel||'')+(s.seededFrom?' · via <em>'+esc(s.seededFrom)+'</em>':'')+'</div></span><button class="btn-green btn-sm" style="padding:4px 10px;font-size:.7rem" onclick="quickAddSong(\''+s.id+'\',\''+escA(s.title)+'\')">➕</button>';
-      c.appendChild(it)
-    });
-    $('suggestPlaylistName').value='Discover Mix';
-    $('suggestedResults').classList.remove('hidden');
-  }catch(e){$('suggestedInfo').innerHTML='<span style="color:#f87171">Failed to load suggestions</span>'}finally{btn.disabled=false;btn.textContent='🔮 Discover New Music'}
-}
-async function downloadAllSuggested(){
-  if(!suggestedTracks.length)return;
-  const name=$('suggestPlaylistName').value.trim()||'Discover Mix';
-  const btn=$('suggestDlAllBtn');btn.disabled=true;btn.textContent='⏳ 0%';
-  let done=0;const total=suggestedTracks.length;
-  for(const t of suggestedTracks){
-    try{await fetch('/api/download-song',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoUrl:'https://www.youtube.com/watch?v='+t.id,playlistName:name,format:$('dlFormat').value,quality:$('dlQuality').value})})}catch(_){}
-    done++;btn.textContent='⏳ '+Math.round(done/total*100)+'%';
-  }
-  btn.textContent='✅ '+done+' downloaded!';btn.disabled=false;
-}
-
-// ═══════════ SPOTIFY QUICK DOWNLOAD (Download Tab) ═══════════
+// ═══════════════════════════════════════════
+// SPOTIFY QUICK DOWNLOAD (Listen Now tab)
+// ═══════════════════════════════════════════
 async function spotifyQuickLoad(){
   const url=$('spotifyQuickUrl').value.trim();if(!url)return;
   const el=$('spotifyQuickResults');el.classList.remove('hidden');
-  el.innerHTML='<span class="spinner"></span> Loading playlist from Spotify...';
+  el.innerHTML='<span class="spinner"></span> Loading...';
   try{
     const r=await fetch('/api/spotify-playlist?url='+encodeURIComponent(url));const d=await r.json();
-    if(!r.ok){el.innerHTML='<div class="error-box">'+esc(d.error)+'</div>';return}
-    let html='<div style="margin-bottom:12px"><strong style="font-size:.95rem">🟢 '+esc(d.title)+'</strong><br><span style="color:#a5a3c9;font-size:.8rem">'+d.count+' tracks found</span></div>';
-    html+='<div style="max-height:150px;overflow-y:auto;margin-bottom:12px">';
-    d.tracks.slice(0,20).forEach(t=>{html+='<div class="download-item"><span class="track-num" style="min-width:20px">'+t.index+'.</span><span class="download-title" style="font-size:.8rem">'+esc(t.title)+' <span style="color:#7a78a0">'+esc(t.artist)+'</span></span></div>'});
-    if(d.count>20)html+='<div style="color:#7a78a0;font-size:.75rem;text-align:center;padding:4px">...and '+(d.count-20)+' more tracks</div>';
-    html+='</div>';
-    html+='<div class="progress-bar-container"><div class="progress-bar green" id="spqBar"></div></div>';
-    html+='<p id="spqText" style="color:#a5a3c9;font-size:.8rem;margin-bottom:8px"></p>';
-    html+='<div id="spqList" style="max-height:200px;overflow-y:auto"></div>';
-    html+='<div style="margin-top:10px;text-align:center"><button class="btn-green btn-sm" id="spqBtn" onclick="spotifyQuickDownload()">⬇️ Download All '+d.count+' Tracks</button></div>';
-    el.innerHTML=html;
-    window._spqUrl=url;
-  }catch(e){el.innerHTML='<div class="error-box">Failed to load Spotify playlist</div>'}
+    if(!r.ok){el.innerHTML=`<div class="error-box">${esc(d.error)}</div>`;return}
+    let html=`<div style="margin-bottom:10px"><strong>${esc(d.title)}</strong><br><span style="color:var(--text2);font-size:.78rem">${d.count} tracks</span></div>`;
+    html+='<div style="max-height:120px;overflow-y:auto;margin-bottom:10px">';
+    d.tracks.slice(0,15).forEach(t=>{html+=`<div class="song-row"><div class="song-row-info"><div class="song-row-title">${esc(t.title)}</div><div class="song-row-artist">${esc(t.artist)}</div></div></div>`});
+    if(d.count>15)html+=`<div style="color:var(--text3);font-size:.7rem;text-align:center;padding:4px">...and ${d.count-15} more</div>`;
+    html+='</div><div class="progress-bar"><div class="progress-fill green" id="spqBar"></div></div>';
+    html+='<p id="spqText" style="color:var(--text2);font-size:.78rem;margin-bottom:6px"></p>';
+    html+='<div id="spqList" style="max-height:150px;overflow-y:auto"></div>';
+    html+=`<div style="margin-top:8px;text-align:center"><button class="btn btn-green btn-sm" id="spqBtn" onclick="spotifyQuickDownload()">Download All ${d.count} Tracks</button></div>`;
+    el.innerHTML=html;window._spqUrl=url;
+  }catch(e){el.innerHTML='<div class="error-box">Failed</div>'}
 }
 async function spotifyQuickDownload(){
   const url=window._spqUrl;if(!url)return;
-  const btn=$('spqBtn');btn.disabled=true;btn.textContent='⏳ Downloading...';
-  const fmt=$('dlFormat').value;const q=$('dlQuality').value;
+  const btn=$('spqBtn');btn.disabled=true;btn.textContent='Downloading...';
+  const fmt=$('dlFormat').value,q=$('dlQuality').value;
   const es=new EventSource('/api/spotify-download?url='+encodeURIComponent(url)+'&format='+fmt+'&quality='+q);
-  es.addEventListener('playlist',e=>{const d=JSON.parse(e.data);$('spqText').textContent='0 / '+d.total+' tracks'});
+  es.addEventListener('playlist',e=>{const d=JSON.parse(e.data);$('spqText').textContent='0 / '+d.total});
   es.addEventListener('progress',e=>{const d=JSON.parse(e.data);
-    if(d.total){const p=Math.round(d.current/d.total*100);$('spqBar').style.width=p+'%';$('spqText').textContent=d.current+' / '+d.total+' — '+esc(d.title||'')}
-    const icons={searching:'🔍',downloading:'<span class="spinner"></span>',done:'<span class="status-icon status-done">✓</span>',error:'<span class="status-icon status-error">✗</span>'};
+    if(d.total){const p=Math.round(d.current/d.total*100);$('spqBar').style.width=p+'%';$('spqText').textContent=d.current+' / '+d.total}
+    const icons={searching:'🔍',downloading:'<span class="spinner"></span>',done:'<span class="status-icon done">✓</span>',error:'<span class="status-icon error">✗</span>'};
     let item=document.getElementById('spq-'+d.current);
-    if(!item){item=document.createElement('div');item.id='spq-'+d.current;item.className='download-item';$('spqList').appendChild(item)}
-    item.innerHTML=(icons[d.status]||'')+'<span class="download-title" style="'+(d.status==='error'?'color:#f87171':'')+'">'+esc(d.title||'')+'</span>';
+    if(!item){item=document.createElement('div');item.id='spq-'+d.current;item.className='status-item';$('spqList').appendChild(item)}
+    item.innerHTML=(icons[d.status]||'')+`<span style="${d.status==='error'?'color:var(--accent)':''}">${esc(d.title||'')}</span>`;
     item.scrollIntoView({behavior:'smooth',block:'end'});
   });
-  es.addEventListener('error',e=>{$('spqText').innerHTML='<span style="color:#f87171">'+esc(JSON.parse(e.data).message)+'</span>';es.close();btn.disabled=false;btn.textContent='⬇️ Retry'});
-  es.addEventListener('done',e=>{const d=JSON.parse(e.data);$('spqText').innerHTML='<span style="color:#34d399">✅ '+esc(d.message)+'</span>';es.close();btn.textContent='✅ Done!';btn.disabled=true});
-  es.onerror=()=>{es.close();btn.disabled=false;btn.textContent='⬇️ Retry'}
+  es.addEventListener('error',e=>{$('spqText').innerHTML=`<span style="color:var(--accent)">${esc(JSON.parse(e.data).message)}</span>`;es.close();btn.disabled=false;btn.textContent='Retry'});
+  es.addEventListener('done',e=>{$('spqText').innerHTML=`<span style="color:#34c759">✅ ${esc(JSON.parse(e.data).message)}</span>`;es.close();btn.textContent='Done!';btn.disabled=true;fetch('/api/music/library/refresh',{method:'POST'});setTimeout(()=>loadLibrary(),1000)});
+  es.onerror=()=>{es.close();btn.disabled=false;btn.textContent='Retry'}
 }
 
-// ═══════════ INIT ═══════════
+// ═══════════════════════════════════════════
+// KEYBOARD SHORTCUTS & INIT
+// ═══════════════════════════════════════════
 $('playlistUrl').addEventListener('keydown',e=>{if(e.key==='Enter')fetchPlaylist()});
 $('searchQuery').addEventListener('keydown',e=>{if(e.key==='Enter')searchSongs()});
 $('artistQuery').addEventListener('keydown',e=>{if(e.key==='Enter')searchArtist()});
+
+// Auto-load library on start
+setTimeout(()=>loadLibrary(),500);
+
+// Keyboard shortcuts for player
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')return;
+  if(e.code==='Space'){e.preventDefault();togglePlay()}
+  if(e.code==='ArrowRight'&&e.shiftKey)nextTrack();
+  if(e.code==='ArrowLeft'&&e.shiftKey)prevTrack();
+});
 </script>
 </body>
 </html>
+</task_progress>
+</write_to_file>

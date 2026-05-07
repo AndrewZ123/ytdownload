@@ -3,3 +3,9 @@ downloads/
 config.json
 .DS_Store
 *.log
+
+# iOS build artifacts
+ios-app/ios/App/App.xcarchive/
+ios-app/ios/App/App.xcworkspace/
+ios-app/node_modules/
+ios-app/ios/App/Podfile.lock

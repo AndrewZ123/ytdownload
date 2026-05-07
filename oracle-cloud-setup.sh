@@ -55,7 +55,15 @@ sudo docker build -t ytmusic .
 # 5. Create persistent data directory
 sudo mkdir -p /opt/ytmusic-data
 
-# 6. Create systemd service so it starts on boot
+# 6. Open port 3000 in iptables (Oracle Cloud Ubuntu blocks it by default!)
+echo ""
+echo "🔓 Opening port 3000 in iptables (Oracle Cloud requires this)..."
+sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 3000 -j ACCEPT
+sudo apt-get install -y iptables-persistent
+sudo netfilter-persistent save
+echo "✅ Port 3000 opened"
+
+# 7. Create systemd service so it starts on boot
 echo ""
 echo "🔧 Setting up auto-start service..."
 sudo tee /etc/systemd/system/ytmusic.service > /dev/null << 'EOF'
