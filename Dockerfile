@@ -23,6 +23,8 @@ RUN npm ci --omit=dev
 
 # Copy app
 COPY server.js .
+COPY lib/ ./lib/
+COPY routes/ ./routes/
 COPY public/ ./public/
 
 # Create downloads dir
