@@ -34,9 +34,17 @@ function songKey(s) {
   return (s.playlist || '') + '/' + (s.file || s.filename || '');
 }
 function audioUrl(s) {
-  // If it's a YouTube stream, use the proxy stream endpoint
-  if (s.isStream && s.id) return urlWithKey(`${API}/api/youtube/stream/${s.id}`);
+  // Library songs: stream from server
   return urlWithKey(`${API}/api/music/stream/${s.playlist}/${s.file || s.filename}`);
+}
+
+// Fetch a direct CDN playback URL for YouTube streams (bypasses server proxy)
+async function fetchStreamUrl(videoId) {
+  const res = await apiFetch(`${API}/api/youtube/stream-url/${videoId}`);
+  if (!res.ok) throw new Error(`stream-url API returned ${res.status}`);
+  const data = await res.json();
+  if (!data.streamUrl) throw new Error('No streamUrl in response');
+  return data.streamUrl;
 }
 function ytStreamUrl(videoId) { return urlWithKey(`${API}/api/youtube/stream/${videoId}`); }
 function coverUrl(s) {

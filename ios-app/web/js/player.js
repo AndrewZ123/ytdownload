@@ -67,7 +67,12 @@ async function playSong(song) {
   // Try streaming from server first
   if (!offlineMode) {
     try {
-      audio.src = audioUrl(song);
+      // YouTube streams: use server proxy (reliable, avoids CORS issues)
+      if (song.isStream && song.id) {
+        audio.src = `${API}/api/youtube/stream/${song.id}`;
+      } else {
+        audio.src = audioUrl(song);
+      }
       await audio.play();
       updatePlayerUI(false);
       showMiniPlayer();
@@ -94,7 +99,12 @@ async function playSong(song) {
   }
 
   if (!offlineMode) {
-    audio.src = audioUrl(song);
+    // YouTube streams: fallback to server proxy (avoids CORS issues on CDN)
+    if (song.isStream && song.id) {
+      audio.src = `${API}/api/youtube/stream/${song.id}`;
+    } else {
+      audio.src = audioUrl(song);
+    }
     audio.play().catch(() => {});
     updatePlayerUI(false);
     showMiniPlayer();

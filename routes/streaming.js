@@ -4,6 +4,10 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
+const { SocksProxyAgent } = require('socks-proxy-agent');
+
+// WARP SOCKS proxy agent for routing audio streams through WARP
+const socksAgent = new SocksProxyAgent('socks5://127.0.0.1:40000');
 
 module.exports = function(app, deps) {
 const { config, downloadsDir, buildDownloadArgs, getAudioFiles, sanitize, AUDIO_EXTS, saveConfig, hashStr, getLibraryCache, setLibraryCache, clearLibraryCache, isLibraryCacheValid } = deps;
@@ -70,28 +74,37 @@ app.get('/api/youtube/stream/:videoId', async (req, res) => {
   }
   try {
     const targetUrl = await resolveStreamUrl(videoId);
-    // Proxy the audio stream with range support
+    // Proxy the audio stream with range support (follows redirects)
     const range = req.headers.range;
     const fetchOpts = { headers: { 'User-Agent': 'Mozilla/5.0' } };
     if (range) fetchOpts.headers.Range = range;
-    const protocol = targetUrl.startsWith('https') ? https : http;
-    protocol.get(targetUrl, fetchOpts, streamRes => {
-      if (streamRes.statusCode >= 400) {
-        return res.status(streamRes.statusCode).json({ error: 'Upstream error' });
-      }
-      // Forward headers
-      const headers = {
-        'Content-Type': streamRes.headers['content-type'] || 'audio/mp4',
-        'Accept-Ranges': 'bytes'
-      };
-      if (streamRes.headers['content-length']) headers['Content-Length'] = streamRes.headers['content-length'];
-      if (streamRes.headers['content-range']) headers['Content-Range'] = streamRes.headers['content-range'];
-      res.writeHead(streamRes.statusCode, headers);
-      streamRes.pipe(res);
-    }).on('error', err => {
-      console.error('Stream proxy error:', err.message);
-      if (!res.headersSent) res.status(502).json({ error: 'Stream proxy failed' });
-    });
+
+    function fetchWithRedirects(url, redirectsLeft) {
+      if (redirectsLeft <= 0) return res.status(502).json({ error: 'Too many redirects' });
+      const mod = url.startsWith('https') ? https : http;
+      const opts = { ...fetchOpts, agent: socksAgent };
+      mod.get(url, opts, streamRes => {
+        // Follow redirects
+        if ([301, 302, 303, 307, 308].includes(streamRes.statusCode) && streamRes.headers.location) {
+          return fetchWithRedirects(streamRes.headers.location, redirectsLeft - 1);
+        }
+        if (streamRes.statusCode >= 400) {
+          return res.status(streamRes.statusCode).json({ error: 'Upstream error' });
+        }
+        const headers = {
+          'Content-Type': streamRes.headers['content-type'] || 'audio/mp4',
+          'Accept-Ranges': 'bytes'
+        };
+        if (streamRes.headers['content-length']) headers['Content-Length'] = streamRes.headers['content-length'];
+        if (streamRes.headers['content-range']) headers['Content-Range'] = streamRes.headers['content-range'];
+        res.writeHead(streamRes.statusCode, headers);
+        streamRes.pipe(res);
+      }).on('error', err => {
+        console.error('Stream proxy error:', err.message);
+        if (!res.headersSent) res.status(502).json({ error: 'Stream proxy failed' });
+      });
+    }
+    fetchWithRedirects(targetUrl, 5);
   } catch(e) {
     console.error('Stream resolve error:', e.message);
     if (!res.headersSent) res.status(502).json({ error: 'Could not get stream URL' });
