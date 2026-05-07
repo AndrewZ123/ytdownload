@@ -1,5 +1,12 @@
 // ===== API CALLS =====
 async function apiFetch(url, opts = {}, retries = RETRY_ATTEMPTS) {
+  // Attach API key to every request for server authentication
+  if (apiKey) {
+    if (!opts.headers) opts.headers = {};
+    if (typeof opts.headers === 'object' && !opts.headers['X-API-Key']) {
+      opts.headers['X-API-Key'] = apiKey;
+    }
+  }
   for (let i = 0; i < retries; i++) {
     try {
       const res = await fetch(url, opts);
@@ -84,8 +91,22 @@ async function refreshLibrary() {
 
 function checkServerStatus() {
   const banner = document.getElementById('offlineBanner');
-  fetch(`${API}/api/music/library`, {method: 'HEAD', signal: AbortSignal.timeout(3000)})
-    .then(() => { if (banner) banner.style.display = 'none'; offlineMode = false; })
+  // Use public health endpoint (no auth required) for connectivity check
+  fetch(`${API}/api/health`, {signal: AbortSignal.timeout(5000)})
+    .then(res => res.json().then(data => ({ok: res.ok, data})))
+    .then(({ok, data}) => {
+      if (ok) {
+        if (banner) banner.style.display = 'none';
+        offlineMode = false;
+        // Also refresh API key in case it changed after server restart
+        if (data && data.apiKey) {
+          apiKey = data.apiKey;
+          localStorage.setItem('apiKey', apiKey);
+        }
+      } else {
+        throw new Error('not ok');
+      }
+    })
     .catch(() => { if (banner) banner.style.display = 'flex'; offlineMode = true; });
 }
 

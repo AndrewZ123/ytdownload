@@ -42,9 +42,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPullToRefresh();
 
   // Online/offline events
-  window.addEventListener('online', () => {
+  window.addEventListener('online', async () => {
     offlineMode = false;
     document.getElementById('offlineBanner').style.display = 'none';
+    await fetchApiKey();
     loadLibrary();
     toast('Back online');
   });
@@ -127,6 +128,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   (async () => {
     try { await initDB(); } catch(e) { console.error('initDB failed:', e); }
     try { await Promise.all([loadOfflineKeys(), loadLikedKeys(), loadHistory()]); } catch(e) { console.error('loadKeys failed:', e); }
+    // Fetch API key from server FIRST so all subsequent API calls are authenticated
+    await fetchApiKey();
     // Load real library from server
     try {
       await loadLibrary();

@@ -68,8 +68,8 @@ async function playSong(song) {
   if (!offlineMode) {
     try {
       if (song.isStream && song.id) {
-        // Stream through server proxy (CDN URLs are IP-bound, can't play directly)
-        audio.src = `${API}/api/youtube/stream/${song.id}`;
+        // Stream through server proxy (includes API key for auth)
+        audio.src = ytStreamUrl(song.id);
       } else {
         audio.src = audioUrl(song);
       }
@@ -100,7 +100,7 @@ async function playSong(song) {
 
   if (!offlineMode) {
     if (song.isStream && song.id) {
-      audio.src = `${API}/api/youtube/stream/${song.id}`;
+      audio.src = ytStreamUrl(song.id);
     } else {
       audio.src = audioUrl(song);
     }

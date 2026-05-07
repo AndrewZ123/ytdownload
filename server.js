@@ -48,6 +48,11 @@ function requireApiKey(req, res, next) {
   next();
 }
 
+// Public health endpoint — must be BEFORE requireApiKey so it's accessible without auth
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', apiKey: config.apiKey });
+});
+
 app.use('/api/', requireApiKey);
 
 // ==================== Shared Dependencies ====================
