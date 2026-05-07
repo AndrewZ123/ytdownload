@@ -41,7 +41,6 @@ function resolveStreamUrl(videoId) {
 
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     const ytdlp = spawn('yt-dlp', [
-      '--proxy', 'http://127.0.0.1:40000',
       '-f', 'bestaudio[ext=m4a]/bestaudio/best',
       '--no-check-certificates', '--no-warnings',
       '--prefer-free-formats', '--get-url', url
@@ -74,7 +73,6 @@ app.get('/api/youtube/stream/:videoId', (req, res) => {
 
   // Use yt-dlp to pipe audio directly to stdout - it handles proxy/CDN negotiation
   const ytdlp = spawn('yt-dlp', [
-    '--proxy', 'http://127.0.0.1:40000',
     '-f', 'bestaudio[ext=m4a]/bestaudio/best',
     '--no-check-certificates', '--no-warnings',
     '--no-playlist', '--prefer-free-formats',
@@ -148,7 +146,6 @@ app.get('/api/youtube/info/:videoId', async (req, res) => {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   try {
     const ytdlp = spawn('yt-dlp', [
-      '--proxy', 'http://127.0.0.1:40000',
       '--dump-json', '--no-download', '--no-warnings',
       '--no-check-certificates', url
     ]);
@@ -190,7 +187,7 @@ app.post('/api/music/add', (req, res) => {
     // Snapshot files before download
     const before = new Set(getAudioFiles(targetDir));
 
-    execFile('yt-dlp', ['--proxy', 'http://127.0.0.1:40000', ...buildDownloadArgs(targetDir, 'm4a', '0'), videoUrl],
+    execFile('yt-dlp', [...buildDownloadArgs(targetDir, 'm4a', '0'), videoUrl],
       { maxBuffer: 10 * 1024 * 1024, timeout: 120000 }, (err) => {
         if (err) return res.status(500).json({ error: 'Download failed: ' + err.message });
 
@@ -238,7 +235,7 @@ app.post('/api/music/add', (req, res) => {
     doDownload(url);
   } else if (query) {
     // Search and download first result
-    execFile('yt-dlp', ['--proxy', 'http://127.0.0.1:40000', '--no-warnings', '-J', '--flat-playlist', `ytsearch1:${query}`],
+    execFile('yt-dlp', ['--no-warnings', '-J', '--flat-playlist', `ytsearch1:${query}`],
       { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
         if (err) return res.status(500).json({ error: 'Search failed' });
         try {
@@ -263,7 +260,7 @@ app.get('/api/music/search', (req, res) => {
   if (!query) return res.status(400).json({ error: 'Missing search query' });
 
   const searchUrl = `ytsearch15:${query}`;
-  execFile('yt-dlp', ['--proxy', 'http://127.0.0.1:40000', '--no-warnings', '-J', '--flat-playlist', searchUrl],
+  execFile('yt-dlp', ['--no-warnings', '-J', '--flat-playlist', searchUrl],
     { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }, (err, stdout) => {
       if (err) return res.status(500).json({ error: 'Search failed' });
       try {
