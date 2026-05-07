@@ -41,7 +41,6 @@ function resolveStreamUrl(videoId) {
 
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     const ytdlp = spawn('yt-dlp', [
-      '--proxy', 'socks5://127.0.0.1:9050',
       '-f', 'bestaudio[ext=m4a]/bestaudio/best',
       '--no-check-certificates', '--no-warnings',
       '--prefer-free-formats', '--get-url', url
@@ -122,7 +121,6 @@ app.get('/api/youtube/info/:videoId', async (req, res) => {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   try {
     const ytdlp = spawn('yt-dlp', [
-      '--proxy', 'socks5://127.0.0.1:9050',
       '--dump-json', '--no-download', '--no-warnings',
       '--no-check-certificates', url
     ]);
@@ -237,7 +235,7 @@ app.get('/api/music/search', (req, res) => {
   if (!query) return res.status(400).json({ error: 'Missing search query' });
 
   const searchUrl = `ytsearch15:${query}`;
-  execFile('yt-dlp', ['--proxy', 'socks5://127.0.0.1:9050', '--no-warnings', '-J', '--flat-playlist', searchUrl],
+  execFile('yt-dlp', ['--no-warnings', '-J', '--flat-playlist', searchUrl],
     { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }, (err, stdout) => {
       if (err) return res.status(500).json({ error: 'Search failed' });
       try {
