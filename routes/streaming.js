@@ -63,20 +63,35 @@ function resolveStreamUrl(videoId) {
 // ==================== YouTube Proxy Streaming ====================
 // Resolve CDN URL, then proxy it with Range support for seeking
 
-// Follow HTTP redirects (Node http/https don't follow automatically)
-function httpFollow(url, options = {}, maxRedirects = 5) {
+// Fetch a URL following redirects, with timeout. Returns {response, bodyBuffer}
+function fetchWithRedirects(url, headers = {}, maxRedirects = 5, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
-    const parsedUrl = new URL(url);
-    const requester = parsedUrl.protocol === 'https:' ? https : http;
-    requester.get(url, options, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        if (maxRedirects <= 0) { res.resume(); return reject(new Error('Too many redirects')); }
-        const redirectUrl = new URL(res.headers.location, url).href;
-        res.resume();
-        return httpFollow(redirectUrl, options, maxRedirects - 1).then(resolve).catch(reject);
-      }
-      resolve(res);
-    }).on('error', reject);
+    function attempt(currentUrl, remaining) {
+      const parsed = new URL(currentUrl);
+      const isHttps = parsed.protocol === 'https:';
+      const lib = isHttps ? https : http;
+      const opts = {
+        hostname: parsed.hostname,
+        port: parsed.port || (isHttps ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: 'GET',
+        headers: { ...headers, 'Host': parsed.host },
+        timeout: timeoutMs
+      };
+      const req = lib.request(opts, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          if (remaining <= 0) return reject(new Error('Too many redirects'));
+          const next = new URL(res.headers.location, currentUrl).href;
+          return attempt(next, remaining - 1);
+        }
+        resolve(res);
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('fetch timeout')); });
+      req.end();
+    }
+    attempt(url, maxRedirects);
   });
 }
 
@@ -87,54 +102,40 @@ app.get('/api/youtube/stream/:videoId', async (req, res) => {
   }
 
   try {
-    // Step 1: Resolve CDN URL (cached for 4 hours)
     const cdnUrl = await resolveStreamUrl(videoId);
     console.log(`[stream] Proxying CDN for ${videoId}`);
 
-    // Step 2: Build request headers, forward Range for seeking
     const reqHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       'Accept': '*/*',
-      'Accept-Encoding': 'identity', // no compression for audio streaming
+      'Accept-Encoding': 'identity',
     };
-    if (req.headers.range) {
-      reqHeaders['Range'] = req.headers.range;
-    }
+    if (req.headers.range) reqHeaders['Range'] = req.headers.range;
 
-    // Step 3: Fetch from CDN with redirect following
-    const cdnRes = await httpFollow(cdnUrl, { headers: reqHeaders });
+    const cdnRes = await fetchWithRedirects(cdnUrl, reqHeaders);
 
     if (cdnRes.statusCode >= 400) {
       cdnRes.resume();
-      console.error(`[stream] CDN returned ${cdnRes.statusCode} for ${videoId}`);
-      if (!res.headersSent) res.status(cdnRes.statusCode).json({ error: 'CDN fetch failed' });
+      console.error(`[stream] CDN ${cdnRes.statusCode} for ${videoId}`);
+      if (!res.headersSent) res.status(cdnRes.statusCode).json({ error: 'CDN error' });
       return;
     }
 
-    // Step 4: Build response headers
     const resHeaders = {
       'Content-Type': cdnRes.headers['content-type'] || 'audio/mp4',
       'Cache-Control': 'no-cache',
       'Access-Control-Allow-Origin': '*',
-      'Accept-Ranges': cdnRes.headers['accept-ranges'] || 'bytes',
+      'Accept-Ranges': 'bytes',
     };
-    if (cdnRes.headers['content-range']) {
-      resHeaders['Content-Range'] = cdnRes.headers['content-range'];
-    }
-    if (cdnRes.headers['content-length']) {
-      resHeaders['Content-Length'] = cdnRes.headers['content-length'];
-    }
+    if (cdnRes.headers['content-range']) resHeaders['Content-Range'] = cdnRes.headers['content-range'];
+    if (cdnRes.headers['content-length']) resHeaders['Content-Length'] = cdnRes.headers['content-length'];
 
     res.writeHead(cdnRes.statusCode, resHeaders);
     cdnRes.pipe(res);
-
-    // Clean up on disconnect
-    req.on('close', () => {
-      cdnRes.destroy();
-    });
+    req.on('close', () => cdnRes.destroy());
   } catch(e) {
     console.error(`[stream] Failed for ${videoId}:`, e.message);
-    if (!res.headersSent) res.status(502).json({ error: 'Could not stream: ' + e.message });
+    if (!res.headersSent) res.status(502).json({ error: 'Stream failed: ' + e.message });
   }
 });
 
