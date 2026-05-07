@@ -67,8 +67,23 @@ async function playSong(song) {
   // Try streaming from server first
   if (!offlineMode) {
     try {
-      // YouTube streams: use server proxy (reliable, avoids CORS issues)
       if (song.isStream && song.id) {
+        // Fetch CDN URL from server, then play directly from YouTube CDN (fast, no server bandwidth)
+        const res = await apiFetch(`${API}/api/youtube/stream-url/${song.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.streamUrl) {
+            audio.src = data.streamUrl;
+            await audio.play();
+            updatePlayerUI(false);
+            showMiniPlayer();
+            updateFpLikeBtn();
+            prebufferNext();
+            updateNowPlayingInfo();
+            return;
+          }
+        }
+        // Fallback to server proxy if CDN URL fails
         audio.src = `${API}/api/youtube/stream/${song.id}`;
       } else {
         audio.src = audioUrl(song);
@@ -80,7 +95,7 @@ async function playSong(song) {
       prebufferNext();
       updateNowPlayingInfo();
       return;
-    } catch(e) { console.warn('Stream failed, offline fallback:', e); }
+    } catch(e) { console.warn('Stream failed, trying offline:', e); }
   }
 
   if (offlineKeys.has(key)) {
@@ -99,7 +114,6 @@ async function playSong(song) {
   }
 
   if (!offlineMode) {
-    // YouTube streams: fallback to server proxy (avoids CORS issues on CDN)
     if (song.isStream && song.id) {
       audio.src = `${API}/api/youtube/stream/${song.id}`;
     } else {

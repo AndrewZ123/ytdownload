@@ -4,10 +4,7 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
-const { SocksProxyAgent } = require('socks-proxy-agent');
-
-// WARP SOCKS proxy agent for routing audio streams through WARP
-const socksAgent = new SocksProxyAgent('socks5://127.0.0.1:40000');
+// SOCKS proxy removed - CDN URLs are publicly accessible, no proxy needed
 
 module.exports = function(app, deps) {
 const { config, downloadsDir, buildDownloadArgs, getAudioFiles, sanitize, AUDIO_EXTS, saveConfig, hashStr, getLibraryCache, setLibraryCache, clearLibraryCache, isLibraryCacheValid } = deps;
@@ -82,7 +79,7 @@ app.get('/api/youtube/stream/:videoId', async (req, res) => {
     function fetchWithRedirects(url, redirectsLeft) {
       if (redirectsLeft <= 0) return res.status(502).json({ error: 'Too many redirects' });
       const mod = url.startsWith('https') ? https : http;
-      const opts = { ...fetchOpts, agent: socksAgent };
+      const opts = { ...fetchOpts };
       mod.get(url, opts, streamRes => {
         // Follow redirects
         if ([301, 302, 303, 307, 308].includes(streamRes.statusCode) && streamRes.headers.location) {
