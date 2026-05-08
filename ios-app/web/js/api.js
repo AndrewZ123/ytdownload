@@ -91,9 +91,14 @@ async function refreshLibrary() {
 
 function checkServerStatus() {
   const banner = document.getElementById('offlineBanner');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
   // Use public health endpoint (no auth required) for connectivity check
-  fetch(`${API}/api/health`, {signal: AbortSignal.timeout(5000)})
-    .then(res => res.json().then(data => ({ok: res.ok, data})))
+  fetch(`${API}/api/health`, {signal: controller.signal})
+    .then(res => {
+      clearTimeout(timer);
+      return res.json().then(data => ({ok: res.ok, data}));
+    })
     .then(({ok, data}) => {
       if (ok) {
         if (banner) banner.style.display = 'none';
@@ -107,7 +112,7 @@ function checkServerStatus() {
         throw new Error('not ok');
       }
     })
-    .catch(() => { if (banner) banner.style.display = 'flex'; offlineMode = true; });
+    .catch(() => { clearTimeout(timer); if (banner) banner.style.display = 'flex'; offlineMode = true; });
 }
 
 function showServerError() {

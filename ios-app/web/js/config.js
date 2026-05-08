@@ -15,17 +15,22 @@ let apiKey = localStorage.getItem('apiKey') || '';
 // Fetch API key from server's public health endpoint (no auth required)
 async function fetchApiKey() {
   try {
-    const res = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(5000) });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    console.log('[fetchApiKey] Fetching from', `${API}/api/health`);
+    const res = await fetch(`${API}/api/health`, { signal: controller.signal });
+    clearTimeout(timer);
+    console.log('[fetchApiKey] Response status:', res.status);
     if (res.ok) {
       const data = await res.json();
       if (data.apiKey) {
         apiKey = data.apiKey;
         localStorage.setItem('apiKey', apiKey);
-        console.log('API key fetched from server');
+        console.log('[fetchApiKey] API key fetched successfully');
       }
     }
   } catch(e) {
-    console.warn('Could not fetch API key:', e);
+    console.warn('[fetchApiKey] Could not fetch API key:', e.message || e);
   }
 }
 

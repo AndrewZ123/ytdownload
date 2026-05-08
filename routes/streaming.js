@@ -270,19 +270,36 @@ app.post('/api/music/add', (req, res) => {
   }
 });
 
-// ==================== YouTube Search for iOS App ====================
-// Returns results with streaming URLs for instant playback
+// ==================== YouTube Music Search for iOS App ====================
+// Search cache: 5-minute TTL to avoid repeated yt-dlp calls for same query
+const searchCache = new Map();
+const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 app.get('/api/music/search', (req, res) => {
   const query = req.query.q;
   if (!query) return res.status(400).json({ error: 'Missing search query' });
 
-  const searchUrl = `ytsearch15:${query}`;
-  execFile('yt-dlp', ['--no-warnings', '-J', '--flat-playlist', searchUrl],
+  // Check cache first
+  const cacheKey = query.toLowerCase().trim();
+  const cached = searchCache.get(cacheKey);
+  if (cached && Date.now() - cached.time < SEARCH_CACHE_TTL) {
+    return res.json({ results: cached.results, cached: true });
+  }
+
+  // Use YouTube MUSIC search — only returns songs/albums (no videos/podcasts)
+  const searchUrl = `ytmsearch10:${query}`;
+  execFile('yt-dlp', ['--no-warnings', '--no-check-certificates', '-J', '--flat-playlist', searchUrl],
     { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }, (err, stdout) => {
       if (err) return res.status(500).json({ error: 'Search failed' });
       try {
         const data = JSON.parse(stdout);
-        const results = (data.entries || []).map((e, i) => {
+        const results = (data.entries || [])
+          .filter(e => {
+            // Filter out results longer than 10 minutes (not songs)
+            const dur = e.duration || 0;
+            return dur === 0 || dur <= 600;
+          })
+          .map((e, i) => {
           const id = e.id || e.url || '';
           return {
             index: i + 1,
@@ -298,6 +315,18 @@ app.get('/api/music/search', (req, res) => {
             streamUrl: id ? `/api/youtube/stream/${id}` : ''
           };
         });
+
+        // Cache the results
+        searchCache.set(cacheKey, { results, time: Date.now() });
+
+        // Prune old cache entries periodically
+        if (searchCache.size > 100) {
+          const now = Date.now();
+          for (const [key, val] of searchCache) {
+            if (now - val.time > SEARCH_CACHE_TTL) searchCache.delete(key);
+          }
+        }
+
         res.json({ results });
       } catch (_) { res.status(500).json({ error: 'Parse error' }); }
     });
