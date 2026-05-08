@@ -43,6 +43,8 @@ async function loadLibrary() {
   } catch(e) {
     console.error('Library load failed:', e);
     showServerError();
+    // Start periodic health checks so app reconnects automatically
+    checkServerStatus();
     // Clear stale cache so we never show outdated demo data
     localStorage.removeItem('cachedLibrary');
     songs = [];
@@ -89,30 +91,43 @@ async function refreshLibrary() {
   }
 }
 
+// Check server connectivity and auto-reconnect if needed
+// Runs periodically every 30s when offline
+let _healthCheckInterval = null;
+
 function checkServerStatus() {
   const banner = document.getElementById('offlineBanner');
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  // Use public health endpoint (no auth required) for connectivity check
-  fetch(`${API}/api/health`, {signal: controller.signal})
-    .then(res => {
-      clearTimeout(timer);
-      return res.json().then(data => ({ok: res.ok, data}));
-    })
+  fetch(`${API}/api/health`)
+    .then(res => res.ok ? res.json().then(data => ({ok: true, data})) : Promise.reject('not ok'))
     .then(({ok, data}) => {
-      if (ok) {
-        if (banner) banner.style.display = 'none';
-        offlineMode = false;
-        // Also refresh API key in case it changed after server restart
-        if (data && data.apiKey) {
-          apiKey = data.apiKey;
-          localStorage.setItem('apiKey', apiKey);
-        }
-      } else {
-        throw new Error('not ok');
+      if (banner) banner.style.display = 'none';
+      offlineMode = false;
+      // Refresh API key in case it changed after server restart
+      if (data && data.apiKey) {
+        apiKey = data.apiKey;
+        localStorage.setItem('apiKey', apiKey);
+      }
+      // If we were offline and now reconnected, reload library
+      if (_healthCheckInterval) {
+        clearInterval(_healthCheckInterval);
+        _healthCheckInterval = null;
+        console.log('[health] ✅ Server reconnected — reloading library');
+        toast('Server connected!');
+        loadLibrary().then(cacheLibrary);
       }
     })
-    .catch(() => { clearTimeout(timer); if (banner) banner.style.display = 'flex'; offlineMode = true; });
+    .catch(() => {
+      if (banner) banner.style.display = 'flex';
+      offlineMode = true;
+      // Start periodic health check if not already running
+      if (!_healthCheckInterval) {
+        console.log('[health] ❌ Server unreachable — will retry every 30s');
+        _healthCheckInterval = setInterval(() => {
+          console.log('[health] Retrying...');
+          checkServerStatus();
+        }, 30000);
+      }
+    });
 }
 
 function showServerError() {

@@ -63,21 +63,11 @@ let state_contextKey = '';
 
 function showSettings() {
   showSheet('settings');
-  const el = document.getElementById('settingsServerUrl');
-  if (el) el.value = API;
   const theme = localStorage.getItem('theme') || 'dark';
   document.getElementById('themeDark')?.classList.toggle('active', theme === 'dark');
   document.getElementById('themeLight')?.classList.toggle('active', theme === 'light');
 }
 function hideSettings() { hideSheet('settings'); }
-
-function saveSettings() {
-  const url = document.getElementById('settingsServerUrl')?.value?.trim().replace(/\/+$/, '');
-  if (url) localStorage.setItem('serverUrl', url);
-  hideSettings();
-  toast('Reconnecting to ' + url + '...');
-  setTimeout(() => location.reload(), 1000);
-}
 
 // ===== HAPTIC FEEDBACK =====
 async function hapticImpact(style = 'LIGHT') {

@@ -2,6 +2,9 @@
   "appId": "com.ytmusic.app",
   "appName": "My Music",
   "webDir": "web",
+  "server": {
+    "allowNavigation": ["157.151.254.26:3000"]
+  },
   "ios": {
     "allowsLinkPreview": false
   },

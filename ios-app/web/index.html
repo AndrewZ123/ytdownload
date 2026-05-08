@@ -321,8 +321,8 @@
   <div class="sheet-header"><h2>Settings</h2><button class="icon-btn" onclick="hideSettings()"><svg class="icon-md"><use href="#icon-x"/></svg></button></div>
   <div class="sheet-body">
     <div class="setting-group">
-      <label class="setting-label">Server URL</label>
-      <input type="url" id="settingsServerUrl" class="setting-input" placeholder="http://...">
+      <label class="setting-label">Server</label>
+      <div style="color:var(--text2);font-size:14px;padding:8px 0">Oracle Cloud (connected)</div>
     </div>
     <div class="setting-group">
       <label class="setting-label">Theme</label>
@@ -331,7 +331,6 @@
         <button class="theme-btn" id="themeLight" onclick="setTheme('light')"><svg class="icon-sm"><use href="#icon-sun"/></svg> Light</button>
       </div>
     </div>
-    <button class="action-btn primary" onclick="saveSettings()">Save & Reconnect</button>
   </div>
 </div>
 

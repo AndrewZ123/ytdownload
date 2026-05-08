@@ -270,12 +270,37 @@ app.post('/api/music/add', (req, res) => {
   }
 });
 
-// ==================== YouTube Music Search for iOS App ====================
-// Search cache: 5-minute TTL to avoid repeated yt-dlp calls for same query
+// ==================== YouTube Data API Search ====================
+const YT_API_KEY = 'AIzaSyDIfpfOC-iA5Tn-hOzsXjNOvISh0BicxUU';
+
+// Search cache: 5-minute TTL to avoid repeated API calls for same query
 const searchCache = new Map();
 const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-app.get('/api/music/search', (req, res) => {
+// Helper: make a JSON GET request
+function fetchJSON(url) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const lib = parsed.protocol === 'https:' ? https : http;
+    lib.get(url, { headers: { 'User-Agent': 'Melodia/1.0' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return fetchJSON(res.headers.location).then(resolve).catch(reject);
+      }
+      if (res.statusCode >= 400) {
+        res.resume();
+        return reject(new Error(`HTTP ${res.statusCode}`));
+      }
+      let data = '';
+      res.on('data', d => { data += d; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(e); }
+      });
+    }).on('error', reject);
+  });
+}
+
+app.get('/api/music/search', async (req, res) => {
   const query = req.query.q;
   if (!query) return res.status(400).json({ error: 'Missing search query' });
 
@@ -286,50 +311,113 @@ app.get('/api/music/search', (req, res) => {
     return res.json({ results: cached.results, cached: true });
   }
 
-  // Use YouTube MUSIC search — only returns songs/albums (no videos/podcasts)
-  const searchUrl = `ytmsearch10:${query}`;
-  execFile('yt-dlp', ['--no-warnings', '--no-check-certificates', '-J', '--flat-playlist', searchUrl],
-    { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }, (err, stdout) => {
-      if (err) return res.status(500).json({ error: 'Search failed' });
+  try {
+    // Use YouTube Data API for fast, reliable search
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=20&q=${encodeURIComponent(query)}&key=${YT_API_KEY}`;
+    const searchData = await fetchJSON(searchUrl);
+
+    if (!searchData.items || searchData.items.length === 0) {
+      return res.json({ results: [] });
+    }
+
+    // Get video IDs for duration lookup
+    const videoIds = searchData.items.map(item => item.id.videoId).filter(Boolean).join(',');
+    let durations = {};
+
+    if (videoIds) {
       try {
-        const data = JSON.parse(stdout);
-        const results = (data.entries || [])
-          .filter(e => {
-            // Filter out results longer than 10 minutes (not songs)
-            const dur = e.duration || 0;
-            return dur === 0 || dur <= 600;
-          })
-          .map((e, i) => {
-          const id = e.id || e.url || '';
-          return {
-            index: i + 1,
-            title: e.title || 'Unknown',
-            id,
-            url: id ? `https://www.youtube.com/watch?v=${id}` : '',
-            duration: e.duration || null,
-            durationFormatted: e.duration ? `${Math.floor(e.duration / 60)}:${(e.duration % 60).toString().padStart(2, '0')}` : '',
-            channel: e.channel || e.uploader || '',
-            thumbnail: (e.thumbnails && e.thumbnails.length > 0)
-              ? (e.thumbnails.find(t => t.width >= 200 && t.width <= 400) || e.thumbnails[e.thumbnails.length - 1]).url
-              : (id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : ''),
-            streamUrl: id ? `/api/youtube/stream/${id}` : ''
-          };
-        });
-
-        // Cache the results
-        searchCache.set(cacheKey, { results, time: Date.now() });
-
-        // Prune old cache entries periodically
-        if (searchCache.size > 100) {
-          const now = Date.now();
-          for (const [key, val] of searchCache) {
-            if (now - val.time > SEARCH_CACHE_TTL) searchCache.delete(key);
-          }
+        const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${YT_API_KEY}`;
+        const detailsData = await fetchJSON(detailsUrl);
+        if (detailsData.items) {
+          detailsData.items.forEach(item => {
+            // Parse ISO 8601 duration (PT3M45S → 225 seconds)
+            const match = item.contentDetails?.duration?.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+            if (match) {
+              const h = parseInt(match[1] || '0', 10);
+              const m = parseInt(match[2] || '0', 10);
+              const s = parseInt(match[3] || '0', 10);
+              durations[item.id] = h * 3600 + m * 60 + s;
+            }
+          });
         }
+      } catch (e) {
+        console.warn('[search] Duration lookup failed:', e.message);
+      }
+    }
 
-        res.json({ results });
-      } catch (_) { res.status(500).json({ error: 'Parse error' }); }
-    });
+    const results = searchData.items
+      .filter(item => item.id && item.id.videoId)
+      .map((item, i) => {
+        const videoId = item.id.videoId;
+        const dur = durations[videoId] || 0;
+        // Filter out results longer than 10 minutes (not songs)
+        if (dur > 600) return null;
+        const snippet = item.snippet || {};
+        const thumbs = snippet.thumbnails || {};
+        // Pick best thumbnail: medium > high > default
+        const thumb = (thumbs.medium || thumbs.high || thumbs.default || {}).url || '';
+        const durationFormatted = dur > 0
+          ? `${Math.floor(dur / 60)}:${(dur % 60).toString().padStart(2, '0')}`
+          : '';
+
+        return {
+          index: i + 1,
+          title: snippet.title || 'Unknown',
+          id: videoId,
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+          duration: dur || null,
+          durationFormatted,
+          channel: snippet.channelTitle || '',
+          thumbnail: thumb || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+          streamUrl: `/api/youtube/stream/${videoId}`
+        };
+      })
+      .filter(Boolean);
+
+    // Cache the results
+    searchCache.set(cacheKey, { results, time: Date.now() });
+
+    // Prune old cache entries periodically
+    if (searchCache.size > 100) {
+      const now = Date.now();
+      for (const [key, val] of searchCache) {
+        if (now - val.time > SEARCH_CACHE_TTL) searchCache.delete(key);
+      }
+    }
+
+    res.json({ results });
+  } catch (e) {
+    console.error('[search] YouTube Data API failed:', e.message);
+    // Fallback to yt-dlp search if API fails
+    const searchUrl = `ytsearch10:${query}`;
+    execFile('yt-dlp', ['--no-warnings', '--no-check-certificates', '-J', '--flat-playlist', searchUrl],
+      { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }, (err, stdout) => {
+        if (err) return res.status(500).json({ error: 'Search failed' });
+        try {
+          const data = JSON.parse(stdout);
+          const results = (data.entries || [])
+            .filter(e => { const dur = e.duration || 0; return dur === 0 || dur <= 600; })
+            .map((e, i) => {
+              const id = e.id || e.url || '';
+              return {
+                index: i + 1,
+                title: e.title || 'Unknown',
+                id,
+                url: id ? `https://www.youtube.com/watch?v=${id}` : '',
+                duration: e.duration || null,
+                durationFormatted: e.duration ? `${Math.floor(e.duration / 60)}:${(e.duration % 60).toString().padStart(2, '0')}` : '',
+                channel: e.channel || e.uploader || '',
+                thumbnail: (e.thumbnails && e.thumbnails.length > 0)
+                  ? (e.thumbnails.find(t => t.width >= 200 && t.width <= 400) || e.thumbnails[e.thumbnails.length - 1]).url
+                  : (id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : ''),
+                streamUrl: id ? `/api/youtube/stream/${id}` : ''
+              };
+            });
+          searchCache.set(cacheKey, { results, time: Date.now() });
+          res.json({ results });
+        } catch (_) { res.status(500).json({ error: 'Parse error' }); }
+      });
+  }
 });
 
 // ==================== Thumbnail/Image Proxy ====================
