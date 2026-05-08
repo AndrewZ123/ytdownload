@@ -38,14 +38,8 @@ function audioUrl(s) {
   return urlWithKey(`${API}/api/music/stream/${s.playlist}/${s.file || s.filename}`);
 }
 
-// Fetch a direct CDN playback URL for YouTube streams (bypasses server proxy)
-async function fetchStreamUrl(videoId) {
-  const res = await apiFetch(`${API}/api/youtube/stream-url/${videoId}`);
-  if (!res.ok) throw new Error(`stream-url API returned ${res.status}`);
-  const data = await res.json();
-  if (!data.streamUrl) throw new Error('No streamUrl in response');
-  return data.streamUrl;
-}
+// YouTube stream URL — always proxied through server for iOS CORS/ATS compatibility
+// Server handles yt-dlp resolution, caching, and deduplication
 function ytStreamUrl(videoId) { return urlWithKey(`${API}/api/youtube/stream/${videoId}`); }
 function coverUrl(s) {
   // Use server-provided coverUrl if available (already correct format)

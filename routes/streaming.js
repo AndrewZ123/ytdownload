@@ -13,6 +13,9 @@ const { config, downloadsDir, buildDownloadArgs, getAudioFiles, sanitize, AUDIO_
 const streamUrlCache = new Map();
 const STREAM_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
 
+// In-flight request deduplication: prevents multiple yt-dlp calls for the same videoId
+const pendingResolves = new Map();
+
 function getCachedStreamUrl(videoId) {
   const cached = streamUrlCache.get(videoId);
   if (cached && Date.now() - cached.time < STREAM_CACHE_TTL) {
@@ -33,31 +36,71 @@ function setCachedStreamUrl(videoId, url) {
   }
 }
 
-// Resolve a YouTube stream URL (with caching)
+// Resolve a YouTube stream URL (with caching + deduplication)
 function resolveStreamUrl(videoId) {
-  return new Promise((resolve, reject) => {
-    const cached = getCachedStreamUrl(videoId);
-    if (cached) return resolve(cached);
+  // 1. Check memory cache
+  const cached = getCachedStreamUrl(videoId);
+  if (cached) {
+    console.log(`[stream] Cache hit for ${videoId}`);
+    return Promise.resolve(cached);
+  }
 
+  // 2. Check if there's already a pending resolution for this videoId
+  const pending = pendingResolves.get(videoId);
+  if (pending) {
+    console.log(`[stream] Dedup: reusing pending resolve for ${videoId}`);
+    return pending;
+  }
+
+  // 3. Start new resolution
+  const promise = new Promise((resolve, reject) => {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const ytdlp = spawn('yt-dlp', [
-      '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+    console.log(`[stream] Resolving ${videoId} via yt-dlp...`);
+
+    // Prefer m4a (AAC) for iOS compatibility, fallback to any best audio
+    const args = [
+      '-f', 'bestaudio[ext=m4a]/bestaudio[acodec=aac]/bestaudio/best',
       '--no-check-certificates', '--no-warnings',
-      '--prefer-free-formats', '--get-url', url
-    ]);
+      '--socket-timeout', '15',
+      '--retries', '3',
+      '--fragment-retries', '3',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      '--get-url', url
+    ];
+
+    const ytdlp = spawn('yt-dlp', args);
     let streamUrl = '';
     let errMsg = '';
     ytdlp.stdout.on('data', d => { streamUrl += d.toString(); });
     ytdlp.stderr.on('data', d => { errMsg += d.toString(); });
+
+    // Kill yt-dlp if it takes too long
+    const ytdlpTimeout = setTimeout(() => {
+      try { ytdlp.kill('SIGKILL'); } catch(_) {}
+      reject(new Error('yt-dlp timed out after 30s'));
+    }, 30000);
     ytdlp.on('close', code => {
+      clearTimeout(ytdlpTimeout);
+      pendingResolves.delete(videoId);
       if (code !== 0 || !streamUrl.trim()) {
+        console.error(`[stream] yt-dlp failed for ${videoId}: code=${code} err=${errMsg.slice(0, 300)}`);
         return reject(new Error(errMsg || 'Could not get stream URL'));
       }
       const finalUrl = streamUrl.trim().split('\n')[0];
+      console.log(`[stream] Resolved ${videoId} → ${finalUrl.slice(0, 120)}... (${finalUrl.includes('.googlevideo.com') ? 'CDN' : 'unknown'})`);
       setCachedStreamUrl(videoId, finalUrl);
       resolve(finalUrl);
     });
+    ytdlp.on('error', err => {
+      clearTimeout(ytdlpTimeout);
+      pendingResolves.delete(videoId);
+      console.error(`[stream] yt-dlp spawn error for ${videoId}:`, err.message);
+      reject(new Error('yt-dlp not available: ' + err.message));
+    });
   });
+
+  pendingResolves.set(videoId, promise);
+  return promise;
 }
 
 // ==================== YouTube Proxy Streaming ====================
@@ -170,7 +213,9 @@ app.get('/api/youtube/info/:videoId', async (req, res) => {
     ytdlp.stdout.on('data', d => { data += d.toString(); });
     let errMsg = '';
     ytdlp.stderr.on('data', d => { errMsg += d.toString(); });
+    const infoTimeout = setTimeout(() => { try { ytdlp.kill('SIGKILL'); } catch(_) {} }, 15000);
     ytdlp.on('close', code => {
+      clearTimeout(infoTimeout);
       if (code !== 0 || !data.trim()) {
         return res.status(502).json({ error: 'Could not get video info' });
       }

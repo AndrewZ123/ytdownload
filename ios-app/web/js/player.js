@@ -61,18 +61,37 @@ async function playSong(song) {
   if (!song) return;
   currentSong = song;
   addToHistory(song);
+  updatePlayerUI(false);
+  showMiniPlayer();
+  updateFpLikeBtn();
+  updateNowPlayingInfo();
 
   const key = songKey(song);
 
-  // Try streaming from server first
-  if (!offlineMode) {
+  // 1. Try offline first if available
+  if (offlineKeys.has(key)) {
     try {
-      if (song.isStream && song.id) {
-        // Stream through server proxy (includes API key for auth)
-        audio.src = ytStreamUrl(song.id);
-      } else {
-        audio.src = audioUrl(song);
+      const stored = await dbGet('songs', key);
+      if (stored?.blob) {
+        audio.src = URL.createObjectURL(stored.blob);
+        await audio.play();
+        updatePlayerUI(true);
+        updateNowPlayingInfo();
+        return;
       }
+    } catch(e) { console.warn('[player] Offline play failed:', e); }
+  }
+
+  // 2. Online streaming
+  if (!offlineMode) {
+    // YouTube stream: use server proxy (reliable, CORS-safe for iOS WKWebView)
+    if (song.isStream && song.id) {
+      return await playStreamSong(song);
+    }
+
+    // Library song: stream directly from server
+    try {
+      audio.src = audioUrl(song);
       await audio.play();
       updatePlayerUI(false);
       showMiniPlayer();
@@ -80,38 +99,61 @@ async function playSong(song) {
       prebufferNext();
       updateNowPlayingInfo();
       return;
-    } catch(e) { console.warn('Stream failed, trying offline:', e); }
-  }
-
-  if (offlineKeys.has(key)) {
-    try {
-      const stored = await dbGet('songs', key);
-      if (stored?.blob) {
-        audio.src = URL.createObjectURL(stored.blob);
-        audio.play().catch(() => {});
-        updatePlayerUI(true);
-        showMiniPlayer();
-        updateFpLikeBtn();
-        updateNowPlayingInfo();
-        return;
-      }
-    } catch(e) { console.error('Offline play failed:', e); }
-  }
-
-  if (!offlineMode) {
-    if (song.isStream && song.id) {
-      audio.src = ytStreamUrl(song.id);
-    } else {
-      audio.src = audioUrl(song);
+    } catch(e) {
+      console.warn('[player] Library stream failed:', e.name, e.message);
+      toast('Playback error');
+      return;
     }
-    audio.play().catch(() => {});
-    updatePlayerUI(false);
-    showMiniPlayer();
-    updateFpLikeBtn();
-    updateNowPlayingInfo();
-  } else {
-    toast('Song not available offline');
   }
+
+  // 3. Offline mode and not available locally
+  toast('Song not available offline');
+}
+
+// Stream a YouTube song via server proxy (reliable, CORS-safe for iOS WKWebView)
+// Server handles caching + deduplication so we just hit the proxy endpoint directly.
+async function playStreamSong(song) {
+  const videoId = song.id;
+  console.log('[player] Streaming', videoId, song.title);
+
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      // Stream through server proxy — server resolves yt-dlp once and caches
+      const proxyUrl = ytStreamUrl(videoId);
+      console.log(`[player] Proxy play attempt ${attempt + 1}/${MAX_ATTEMPTS}`);
+      audio.src = proxyUrl;
+
+      // Wait for play or timeout (20s for first attempt to allow yt-dlp resolve, shorter for retries)
+      const timeoutMs = attempt === 0 ? 20000 : 10000;
+      const playPromise = audio.play();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Play timeout')), timeoutMs)
+      );
+      await Promise.race([playPromise, timeoutPromise]);
+
+      updatePlayerUI(false);
+      showMiniPlayer();
+      updateFpLikeBtn();
+      prebufferNext();
+      updateNowPlayingInfo();
+      console.log('[player] ✅ Playing', videoId);
+      return;
+    } catch(err) {
+      const errName = err?.name || 'UnknownError';
+      const errMsg = err?.message || String(err);
+      console.warn(`[player] Attempt ${attempt + 1} failed:`, errName, errMsg);
+
+      audio.src = '';
+      if (attempt < MAX_ATTEMPTS - 1) {
+        await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+      }
+    }
+  }
+
+  console.error('[player] ❌ All attempts failed for', videoId);
+  toast('Could not play this song');
+  audio.src = '';
 }
 
 function playSongFromList(key, listId) {
@@ -193,8 +235,13 @@ audio.addEventListener('pause', () => {
 });
 
 audio.addEventListener('error', () => {
+  const code = audio.error?.code;
+  const msg = audio.error?.message;
+  const codeNames = { 1: 'ABORTED', 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' };
+  const errName = codeNames[code] || 'UNKNOWN';
+  console.warn(`[player] Audio error: ${errName} (code=${code})`, msg || '');
   if (currentSong && offlineMode) toast('Stream unavailable offline');
-  else if (currentSong) toast('Playback error');
+  else if (currentSong) toast('Playback error: ' + errName);
 });
 
 function updatePlayerUI(isOffline) {
