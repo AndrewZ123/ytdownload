@@ -171,9 +171,8 @@ async function downloadResult(idx) {
 // --- Pre-cache stream URL for faster playback ---
 function preCacheStreamUrl(videoId) {
   if (!videoId) return;
-  apiFetch(`${API}/api/youtube/stream-url/${videoId}`)
-    .then(r => r.ok ? r.json() : null)
-    .catch(() => {}); // silent - this is just a prefetch
+  // Use fetchStreamUrl which caches the CDN URL client-side
+  fetchStreamUrl(videoId).catch(() => {}); // silent - this is just a prefetch
 }
 
 function clearSearch() {

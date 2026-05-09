@@ -76,7 +76,7 @@ Requires=docker.service
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=/usr/bin/docker run --name ytmusic --rm -p 3000:3000 -v /opt/ytmusic-data:/app/downloads ytmusic
+ExecStart=/usr/bin/docker run --name ytmusic --rm --network host -v /opt/ytmusic-data:/app/downloads ytmusic
 ExecStop=/usr/bin/docker stop ytmusic
 
 [Install]

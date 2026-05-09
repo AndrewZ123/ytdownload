@@ -6,7 +6,7 @@ const https = require('https');
 const crypto = require('crypto');
 
 module.exports = function(app, deps) {
-const { config, downloadsDir, buildDownloadArgs, getAudioFiles, sanitize, AUDIO_EXTS, saveConfig, hashStr, getLibraryCache, setLibraryCache, clearLibraryCache, isLibraryCacheValid } = deps;
+const { config, downloadsDir, buildDownloadArgs, getAudioFiles, sanitize, AUDIO_EXTS, saveConfig, hashStr, getLibraryCache, setLibraryCache, clearLibraryCache, isLibraryCacheValid, getProxyArgs } = deps;
 
 // ==================== Stream URL Cache ====================
 // YouTube stream URLs expire after ~6 hours. Cache for 4 hours to avoid re-running yt-dlp.
@@ -59,6 +59,7 @@ function resolveStreamUrl(videoId) {
 
     // Prefer m4a (AAC) for iOS compatibility, fallback to any best audio
     const args = [
+      ...getProxyArgs(),
       '-f', 'bestaudio[ext=m4a]/bestaudio[acodec=aac]/bestaudio/best',
       '--no-check-certificates', '--no-warnings',
       '--socket-timeout', '15',
@@ -206,6 +207,7 @@ app.get('/api/youtube/info/:videoId', async (req, res) => {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   try {
     const ytdlp = spawn('yt-dlp', [
+      ...getProxyArgs(),
       '--dump-json', '--no-download', '--no-warnings',
       '--no-check-certificates', url
     ]);
@@ -249,7 +251,7 @@ app.post('/api/music/add', (req, res) => {
     // Snapshot files before download
     const before = new Set(getAudioFiles(targetDir));
 
-    execFile('yt-dlp', [...buildDownloadArgs(targetDir, 'm4a', '0'), videoUrl],
+    execFile('yt-dlp', [...getProxyArgs(), ...buildDownloadArgs(config, targetDir, 'm4a', '0'), videoUrl],
       { maxBuffer: 10 * 1024 * 1024, timeout: 120000 }, (err) => {
         if (err) return res.status(500).json({ error: 'Download failed: ' + err.message });
 
@@ -297,7 +299,7 @@ app.post('/api/music/add', (req, res) => {
     doDownload(url);
   } else if (query) {
     // Search and download first result
-    execFile('yt-dlp', ['--no-warnings', '-J', '--flat-playlist', `ytsearch1:${query}`],
+    execFile('yt-dlp', [...getProxyArgs(), '--no-warnings', '-J', '--flat-playlist', `ytsearch1:${query}`],
       { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
         if (err) return res.status(500).json({ error: 'Search failed' });
         try {
@@ -435,7 +437,7 @@ app.get('/api/music/search', async (req, res) => {
     console.error('[search] YouTube Data API failed:', e.message);
     // Fallback to yt-dlp search if API fails
     const searchUrl = `ytsearch10:${query}`;
-    execFile('yt-dlp', ['--no-warnings', '--no-check-certificates', '-J', '--flat-playlist', searchUrl],
+    execFile('yt-dlp', [...getProxyArgs(), '--no-warnings', '--no-check-certificates', '-J', '--flat-playlist', searchUrl],
       { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }, (err, stdout) => {
         if (err) return res.status(500).json({ error: 'Search failed' });
         try {
