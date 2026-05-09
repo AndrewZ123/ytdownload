@@ -118,8 +118,8 @@ function resolveStreamUrl(videoId) {
 // Resolve CDN URL, then proxy it with Range support for seeking
 
 // Fetch a URL following redirects, with timeout. Routes through WARP SOCKS5 if available.
-function fetchWithRedirects(url, headers = {}, maxRedirects = 5, timeoutMs = 15000) {
-  const useWarp = isWarpAvailable();
+function fetchWithRedirects(url, headers = {}, maxRedirects = 5, timeoutMs = 15000, useWarp) {
+  if (useWarp === undefined) useWarp = isWarpAvailable();
   return new Promise((resolve, reject) => {
     function attempt(currentUrl, remaining) {
       const parsed = new URL(currentUrl);
@@ -162,9 +162,53 @@ app.get('/api/youtube/stream/:videoId', async (req, res) => {
 
   try {
     const cdnUrl = await resolveStreamUrl(videoId);
-    console.log(`[stream] Redirecting ${videoId} → CDN`);
-    // 302 redirect to YouTube CDN — client streams directly, avoiding slow WARP proxy
-    res.redirect(cdnUrl);
+    console.log(`[stream] Proxying ${videoId} → CDN`);
+
+    // Proxy the audio through the server for iOS compatibility.
+    // iOS WKWebView can't play webm/opus — proxying lets us control the response.
+    // CDN URLs are publicly accessible, so we skip WARP proxy for speed.
+    const range = req.headers.range;
+    const fetchHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+    };
+    if (range) fetchHeaders['Range'] = range;
+
+    // Fetch CDN directly (no WARP — CDN URLs are public, WARP would slow it down)
+    const cdnRes = await fetchWithRedirects(cdnUrl, fetchHeaders, 5, 30000, false);
+
+    if (cdnRes.statusCode >= 400) {
+      cdnRes.resume();
+      return res.status(cdnRes.statusCode).json({ error: 'CDN returned ' + cdnRes.statusCode });
+    }
+
+    // Detect content type from CDN response or URL extension
+    let contentType = cdnRes.headers['content-type'] || 'audio/mp4';
+    if (contentType === 'application/octet-stream' || contentType === 'binary/octet-stream') {
+      // Guess from URL
+      if (cdnUrl.includes('.webm')) contentType = 'audio/webm';
+      else contentType = 'audio/mp4';
+    }
+    // Force audio/mp4 for m4a/aac streams — iOS needs this
+    if (cdnUrl.includes('mime=audio%2Fmp4') || cdnUrl.includes('.m4a') || cdnUrl.includes('audio/mp4')) {
+      contentType = 'audio/mp4';
+    }
+
+    const headers = {
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'public, max-age=3600',
+    };
+    if (cdnRes.headers['content-length']) headers['Content-Length'] = cdnRes.headers['content-length'];
+    if (cdnRes.headers['content-range']) headers['Content-Range'] = cdnRes.headers['content-range'];
+
+    const status = cdnRes.statusCode === 206 ? 206 : 200;
+    res.writeHead(status, headers);
+    cdnRes.pipe(res);
+
+    cdnRes.on('error', () => { if (!res.writableEnded) res.end(); });
+    req.on('close', () => { cdnRes.destroy(); });
   } catch(e) {
     console.error(`[stream] Failed for ${videoId}:`, e.message);
     if (!res.headersSent) res.status(502).json({ error: 'Stream failed: ' + e.message });
@@ -178,8 +222,12 @@ app.get('/api/youtube/stream-url/:videoId', async (req, res) => {
     return res.status(400).json({ error: 'Invalid video ID' });
   }
   try {
-    const url = await resolveStreamUrl(videoId);
-    res.json({ videoId, streamUrl: url, cached: true });
+    await resolveStreamUrl(videoId);
+    // Return the PROXY URL (server stream endpoint), not the raw CDN URL.
+    // iOS WKWebView gets SRC_NOT_SUPPORTED with raw YouTube CDN URLs for some formats.
+    // The proxy endpoint handles format conversion and Range headers properly.
+    const proxyUrl = `${req.protocol}://${req.get('host')}/api/youtube/stream/${videoId}`;
+    res.json({ videoId, streamUrl: proxyUrl, cached: true });
   } catch(e) {
     res.status(502).json({ error: 'Could not resolve stream URL' });
   }
