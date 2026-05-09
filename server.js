@@ -84,6 +84,7 @@ const deps = {
   clearLibraryCache: utils.clearLibraryCache,
   isLibraryCacheValid: utils.isLibraryCacheValid,
   getProxyArgs: utils.getProxyArgs,
+  isWarpAvailable: utils.isWarpAvailable,
 };
 
 // ==================== Load Route Modules ====================

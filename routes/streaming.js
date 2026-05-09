@@ -4,9 +4,19 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
+const { SocksProxyAgent } = require('socks-proxy-agent');
+
+// WARP SOCKS5 proxy agent (reused across requests)
+let _warpAgent = null;
+function getWarpAgent() {
+  if (!_warpAgent) {
+    _warpAgent = new SocksProxyAgent('socks5://127.0.0.1:40000');
+  }
+  return _warpAgent;
+}
 
 module.exports = function(app, deps) {
-const { config, downloadsDir, buildDownloadArgs, getAudioFiles, sanitize, AUDIO_EXTS, saveConfig, hashStr, getLibraryCache, setLibraryCache, clearLibraryCache, isLibraryCacheValid, getProxyArgs } = deps;
+const { config, downloadsDir, buildDownloadArgs, getAudioFiles, sanitize, AUDIO_EXTS, saveConfig, hashStr, getLibraryCache, setLibraryCache, clearLibraryCache, isLibraryCacheValid, getProxyArgs, isWarpAvailable } = deps;
 
 // ==================== Stream URL Cache ====================
 // YouTube stream URLs expire after ~6 hours. Cache for 4 hours to avoid re-running yt-dlp.
@@ -107,8 +117,9 @@ function resolveStreamUrl(videoId) {
 // ==================== YouTube Proxy Streaming ====================
 // Resolve CDN URL, then proxy it with Range support for seeking
 
-// Fetch a URL following redirects, with timeout. Returns {response, bodyBuffer}
+// Fetch a URL following redirects, with timeout. Routes through WARP SOCKS5 if available.
 function fetchWithRedirects(url, headers = {}, maxRedirects = 5, timeoutMs = 15000) {
+  const useWarp = isWarpAvailable();
   return new Promise((resolve, reject) => {
     function attempt(currentUrl, remaining) {
       const parsed = new URL(currentUrl);
@@ -122,6 +133,10 @@ function fetchWithRedirects(url, headers = {}, maxRedirects = 5, timeoutMs = 150
         headers: { ...headers, 'Host': parsed.host },
         timeout: timeoutMs
       };
+      // Route through WARP SOCKS5 proxy so YouTube CDN sees the same IP as yt-dlp
+      if (useWarp) {
+        opts.agent = getWarpAgent();
+      }
       const req = lib.request(opts, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();

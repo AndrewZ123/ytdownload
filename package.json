@@ -20,6 +20,7 @@
   "type": "commonjs",
   "dependencies": {
     "express": "^5.2.1",
-    "puppeteer-core": "^24.42.0"
+    "puppeteer-core": "^24.42.0",
+    "socks-proxy-agent": "^8.0.5"
   }
 }
