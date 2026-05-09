@@ -308,9 +308,9 @@ app.post('/api/music/add', (req, res) => {
 // ==================== YouTube Data API Search ====================
 const YT_API_KEY = process.env.YT_API_KEY || '';
 
-// Search cache: 30-minute TTL to minimize YouTube API credit usage
+// Search cache: 2-hour TTL to minimize YouTube API credit usage
 const searchCache = new Map();
-const SEARCH_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const SEARCH_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
 // Helper: make a JSON GET request
 function fetchJSON(url) {
