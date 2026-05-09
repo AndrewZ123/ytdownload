@@ -1,10 +1,15 @@
 // ===== CONFIG =====
-// HTTPS domain — update this when you set up a domain + SSL certificate.
-// Format: https://your-domain.com (NO trailing slash, NO port)
+// For development: use HTTP with direct IP and port
+// For production: use HTTPS domain after running ./setup-https.sh your-domain.com
+//   Format: https://your-domain.com (NO trailing slash, NO port)
 //
-// To set up HTTPS on the Oracle server, run: ./setup-https.sh your-domain.com
-// Then update this constant and rebuild the app.
-const API = 'https://melodia.ddns.net';
+// NOTE: iOS release builds REQUIRE HTTPS. To enable:
+//   1. Point your domain DNS to 157.151.254.26 (Oracle server IP)
+//   2. Open ports 80/443 in Oracle Cloud Security List (ingress rules)
+//   3. Run: ./setup-https.sh your-domain.com
+//   4. Update this constant to https://your-domain.com
+//   5. Rebuild the iOS app
+const API = 'http://157.151.254.26:3000';
 
 const APP_NAME = 'Melodia';
 const HISTORY_LIMIT = 50;
