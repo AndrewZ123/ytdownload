@@ -111,17 +111,36 @@ async function playSong(song) {
 }
 
 // Stream a YouTube song via server proxy.
-// Simple flow: audio.src = server proxy URL. The server resolves the CDN URL (yt-dlp),
-// fetches audio, and pipes it back with proper headers. No CORS issues, no raw CDN URLs.
-// The server caches CDN URLs so subsequent plays of the same song are instant.
+// Two-phase approach to avoid iOS <audio> element timeout:
+//   Phase 1: fetch() calls /stream-url to pre-resolve CDN URL on server (patient, no timeout).
+//   Phase 2: Set audio.src to proxy URL and play (instant because CDN URL is now cached).
 async function playStreamSong(song) {
   const videoId = song.id;
   console.log('[player] Streaming', videoId, song.title);
 
-  // Point audio element directly at the server proxy endpoint.
-  // The server handles: yt-dlp resolve → CDN fetch → pipe audio back with proper Content-Type.
-  // First play of a song takes ~5-15s (yt-dlp resolve). Cached songs start instantly.
   const proxyUrl = `${API}/api/youtube/stream/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
+  const resolveUrl = `${API}/api/youtube/stream-url/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
+
+  // Phase 1: Pre-resolve the CDN URL via fetch() (no audio timeout pressure).
+  // This triggers yt-dlp on the server and caches the result. fetch() is patient.
+  // Subsequent plays of the same song skip this step because the CDN URL is cached.
+  try {
+    toast('Loading...');
+    console.log('[player] Pre-resolving', videoId);
+    const res = await fetch(resolveUrl);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Pre-resolve failed');
+    }
+    console.log('[player] Pre-resolved ✅', videoId);
+  } catch(err) {
+    console.error('[player] Pre-resolve failed for', videoId, err.message);
+    toast('Could not load song');
+    audio.src = '';
+    return;
+  }
+
+  // Phase 2: Set audio.src — server now has the CDN URL cached, so data flows instantly.
   audio.src = proxyUrl;
 
   try {
@@ -180,12 +199,11 @@ function prebufferNext() {
   const nextIdx = (queueIndex + 1) % queue.length;
   if (nextIdx !== queueIndex && queue[nextIdx] && !offlineMode) {
     const nextSong = queue[nextIdx];
-    // YouTube streams: warm the server's CDN cache so next playback starts instantly
+    // YouTube streams: pre-resolve CDN URL so next playback starts instantly
     if (nextSong.isStream && nextSong.id) {
-      const warmUrl = `${API}/api/youtube/stream/${nextSong.id}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
-      // Just fetch a small range to trigger yt-dlp resolve + CDN cache on server
-      fetch(warmUrl, { headers: { Range: 'bytes=0-0' } }).catch(() => {});
-      console.log(`[prebuffer] Warming cache for ${nextSong.id}`);
+      const resolveUrl = `${API}/api/youtube/stream-url/${nextSong.id}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
+      fetch(resolveUrl).catch(() => {});
+      console.log(`[prebuffer] Pre-resolving ${nextSong.id}`);
       return;
     }
     try { const a = new Audio(); a.src = audioUrl(nextSong); a.preload = 'auto'; prebufferedSong = nextSong; } catch(e) {}
