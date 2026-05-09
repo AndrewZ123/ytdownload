@@ -110,66 +110,38 @@ async function playSong(song) {
   toast('Song not available offline');
 }
 
-// Stream a YouTube song via server proxy (reliable, CORS-safe for iOS WKWebView)
-// Two-phase approach: pre-resolve CDN URL via fetch(), then stream directly via Audio element.
-// Phase 1: fetch() triggers yt-dlp resolve (slow ~15s) — goes through CapacitorHttp, always works.
-// Phase 2: Audio.src hits the same endpoint which now has the CDN URL cached → instant response.
+// Stream a YouTube song via server proxy.
+// Simple flow: audio.src = server proxy URL. The server resolves the CDN URL (yt-dlp),
+// fetches audio, and pipes it back with proper headers. No CORS issues, no raw CDN URLs.
+// The server caches CDN URLs so subsequent plays of the same song are instant.
 async function playStreamSong(song) {
   const videoId = song.id;
   console.log('[player] Streaming', videoId, song.title);
 
-  const MAX_ATTEMPTS = 3;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    try {
-      // Phase 1: Pre-resolve the stream URL so the server caches the CDN URL
-      // This is the slow part (~15s for yt-dlp) — uses fetch() which CapacitorHttp intercepts reliably
-      const preResolveUrl = `${API}/api/youtube/stream-url/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
-      console.log(`[player] Pre-resolving ${videoId} (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+  // Point audio element directly at the server proxy endpoint.
+  // The server handles: yt-dlp resolve → CDN fetch → pipe audio back with proper Content-Type.
+  // First play of a song takes ~5-15s (yt-dlp resolve). Cached songs start instantly.
+  const proxyUrl = `${API}/api/youtube/stream/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
+  audio.src = proxyUrl;
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
-      const preRes = await fetch(preResolveUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (!preRes.ok) throw new Error(`Pre-resolve HTTP ${preRes.status}`);
-      const preData = await preRes.json();
-      console.log(`[player] Pre-resolved ${videoId} ✅ (cached=${preData.cached})`);
-
-      // Phase 2: Stream via server proxy (not raw CDN URL).
-      // iOS WKWebView gets SRC_NOT_SUPPORTED with raw YouTube CDN URLs for some formats (webm/opus).
-      // The server proxy handles format detection and Range headers properly.
-      const proxyStreamUrl = `${API}/api/youtube/stream/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
-      audio.src = proxyStreamUrl;
-
-      // Wait for play or timeout (shorter now since CDN URL is cached)
-      const playPromise = audio.play();
-      const playTimeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Play timeout')), 10000)
-      );
-      await Promise.race([playPromise, playTimeout]);
-
-      updatePlayerUI(false);
-      showMiniPlayer();
-      updateFpLikeBtn();
-      prebufferNext();
-      updateNowPlayingInfo();
-      console.log('[player] ✅ Playing', videoId);
+  try {
+    await audio.play();
+    updatePlayerUI(false);
+    showMiniPlayer();
+    updateFpLikeBtn();
+    prebufferNext();
+    updateNowPlayingInfo();
+    console.log('[player] ✅ Playing', videoId);
+  } catch(err) {
+    // AbortError is normal if user switched songs before playback started
+    if (err.name === 'AbortError') {
+      console.log('[player] Playback aborted (user likely switched songs)');
       return;
-    } catch(err) {
-      const errName = err?.name || 'UnknownError';
-      const errMsg = err?.message || String(err);
-      console.warn(`[player] Attempt ${attempt + 1} failed:`, errName, errMsg);
-
-      audio.src = '';
-      if (attempt < MAX_ATTEMPTS - 1) {
-        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
-      }
     }
+    console.error('[player] ❌ Stream failed for', videoId, err.name, err.message);
+    toast('Could not play this song');
+    audio.src = '';
   }
-
-  console.error('[player] ❌ All attempts failed for', videoId);
-  toast('Could not play this song');
-  audio.src = '';
 }
 
 function playSongFromList(key, listId) {
@@ -208,12 +180,12 @@ function prebufferNext() {
   const nextIdx = (queueIndex + 1) % queue.length;
   if (nextIdx !== queueIndex && queue[nextIdx] && !offlineMode) {
     const nextSong = queue[nextIdx];
-    // YouTube streams: pre-resolve CDN URL via fetch so next playback is instant
+    // YouTube streams: warm the server's CDN cache so next playback starts instantly
     if (nextSong.isStream && nextSong.id) {
-      const preUrl = `${API}/api/youtube/stream-url/${nextSong.id}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
-      fetch(preUrl).then(r => r.json()).then(d => {
-        if (d.streamUrl) console.log(`[prebuffer] Pre-resolved ${nextSong.id} ✅`);
-      }).catch(() => {});
+      const warmUrl = `${API}/api/youtube/stream/${nextSong.id}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
+      // Just fetch a small range to trigger yt-dlp resolve + CDN cache on server
+      fetch(warmUrl, { headers: { Range: 'bytes=0-0' } }).catch(() => {});
+      console.log(`[prebuffer] Warming cache for ${nextSong.id}`);
       return;
     }
     try { const a = new Audio(); a.src = audioUrl(nextSong); a.preload = 'auto'; prebufferedSong = nextSong; } catch(e) {}
