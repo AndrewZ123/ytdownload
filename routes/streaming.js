@@ -162,41 +162,9 @@ app.get('/api/youtube/stream/:videoId', async (req, res) => {
 
   try {
     const cdnUrl = await resolveStreamUrl(videoId);
-    console.log(`[stream] Proxying CDN for ${videoId}`);
-
-    const reqHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Accept': '*/*',
-      'Accept-Encoding': 'identity',
-    };
-    if (req.headers.range) {
-      // YouTube CDN rejects exact end byte ranges (e.g. bytes=0-51200 → 416)
-      // but accepts open-ended ranges (e.g. bytes=0- → 206). Convert accordingly.
-      const convertedRange = req.headers.range.replace(/bytes=(\d+)-\d+/, 'bytes=$1-');
-      reqHeaders['Range'] = convertedRange;
-    }
-
-    const cdnRes = await fetchWithRedirects(cdnUrl, reqHeaders);
-
-    if (cdnRes.statusCode >= 400) {
-      cdnRes.resume();
-      console.error(`[stream] CDN ${cdnRes.statusCode} for ${videoId}`);
-      if (!res.headersSent) res.status(cdnRes.statusCode).json({ error: 'CDN error' });
-      return;
-    }
-
-    const resHeaders = {
-      'Content-Type': cdnRes.headers['content-type'] || 'audio/mp4',
-      'Cache-Control': 'no-cache',
-      'Access-Control-Allow-Origin': '*',
-      'Accept-Ranges': 'bytes',
-    };
-    if (cdnRes.headers['content-range']) resHeaders['Content-Range'] = cdnRes.headers['content-range'];
-    if (cdnRes.headers['content-length']) resHeaders['Content-Length'] = cdnRes.headers['content-length'];
-
-    res.writeHead(cdnRes.statusCode, resHeaders);
-    cdnRes.pipe(res);
-    req.on('close', () => cdnRes.destroy());
+    console.log(`[stream] Redirecting ${videoId} → CDN`);
+    // 302 redirect to YouTube CDN — client streams directly, avoiding slow WARP proxy
+    res.redirect(cdnUrl);
   } catch(e) {
     console.error(`[stream] Failed for ${videoId}:`, e.message);
     if (!res.headersSent) res.status(502).json({ error: 'Stream failed: ' + e.message });

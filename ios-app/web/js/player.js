@@ -136,9 +136,9 @@ async function playStreamSong(song) {
       if (!preData.streamUrl) throw new Error('No stream URL in pre-resolve response');
       console.log(`[player] Pre-resolved ${videoId} ✅ (cached=${preData.cached})`);
 
-      // Phase 2: Now set Audio.src — server has CDN URL cached, will respond with audio data quickly
-      const proxyUrl = ytStreamUrl(videoId);
-      audio.src = proxyUrl;
+      // Phase 2: Use the CDN URL directly (HTTPS, no CORS for Audio elements)
+      // The server proxy was timing out piping through WARP — direct CDN URL works on iOS
+      audio.src = preData.streamUrl;
 
       // Wait for play or timeout (shorter now since CDN URL is cached)
       const playPromise = audio.play();
