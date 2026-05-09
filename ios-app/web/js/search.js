@@ -1,4 +1,5 @@
 // ===== SEARCH =====
+
 let searchDebounce = null;
 let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
 
@@ -41,14 +42,15 @@ async function doSearch(q) {
 
     renderSearchResults(el, results, q);
   } catch(e) {
-    console.error('Search failed:', e.message || e);
-    el.innerHTML = '<div class="empty-state"><h3>Search Failed</h3><p>' + (e.message || 'Check your connection') + '</p></div>';
+    const errMsg = (e && e.message) ? e.message : String(e || 'Unknown error');
+    console.error('[search] Search failed:', errMsg);
+    el.innerHTML = '<div class="empty-state"><h3>Search Failed</h3><p>' + errMsg + '</p></div>';
   }
 }
 
 // Render search results into a container element
 function renderSearchResults(el, results, query) {
-  if (results.length === 0) {
+  if (!Array.isArray(results) || results.length === 0) {
     el.innerHTML = '<div class="empty-state"><h3>No Results</h3><p>Try a different search term</p></div>';
     return;
   }
@@ -58,7 +60,7 @@ function renderSearchResults(el, results, query) {
   el.innerHTML = results.map((r, i) => {
     const videoId = r.id || '';
     const rawThumb = r.thumbnail || (videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : '');
-    const thumbUrl = rawThumb ? urlWithKey(`${API}/api/proxy/image?url=${encodeURIComponent(rawThumb)}`) : '';
+    const thumbUrl = rawThumb || '';
     const duration = r.durationFormatted || (r.duration ? `${Math.floor(r.duration / 60)}:${(r.duration % 60).toString().padStart(2, '0')}` : '');
 
     return `<div class="search-result-item" onclick="playSearchResult(${i})" role="button" aria-label="Play ${r.title || 'Untitled'}">

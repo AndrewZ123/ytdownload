@@ -3,14 +3,16 @@
   "appName": "My Music",
   "webDir": "web",
   "server": {
-    "allowNavigation": ["157.151.254.26:3000"]
+    "iosScheme": "https",
+    "allowNavigation": ["157.151.254.26:3000"],
+    "cleartext": true
   },
   "ios": {
     "allowsLinkPreview": false
   },
   "plugins": {
     "CapacitorHttp": {
-      "enabled": true
+      "enabled": false
     }
   }
 }

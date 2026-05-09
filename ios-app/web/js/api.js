@@ -1,7 +1,13 @@
-// ===== API CALLS =====
+ // ===== API CALLS =====
 async function apiFetch(url, opts = {}, retries = RETRY_ATTEMPTS) {
-  // Attach API key to every request for server authentication
+  // Attach API key via BOTH header and URL query param for maximum compatibility.
+  // CapacitorHttp plugin intercepts fetch() and may strip custom headers,
+  // so the query param ensures auth works in all environments.
   if (apiKey) {
+    // Add as query param (most reliable with CapacitorHttp)
+    const sep = url.includes('?') ? '&' : '?';
+    url = `${url}${sep}apiKey=${encodeURIComponent(apiKey)}`;
+    // Also try header as fallback for standard browser environments
     if (!opts.headers) opts.headers = {};
     if (typeof opts.headers === 'object' && !opts.headers['X-API-Key']) {
       opts.headers['X-API-Key'] = apiKey;
@@ -10,10 +16,33 @@ async function apiFetch(url, opts = {}, retries = RETRY_ATTEMPTS) {
   for (let i = 0; i < retries; i++) {
     try {
       const res = await fetch(url, opts);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // CapacitorHttp may not set .ok properly — check status directly
+      const isOk = res.ok || (res.status >= 200 && res.status < 300);
+      if (!isOk) {
+        let errBody = '';
+        try { errBody = await res.text(); } catch(_) {}
+        throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+      }
+      // Pre-read body and return a plain wrapper object (NOT new Response()).
+      // WKWebView/CapacitorHttp: new Response() silently fails with non-standard headers,
+      // producing an empty body that makes .json() return {}. Using a plain object avoids this.
+      let bodyText;
+      try { bodyText = await res.text(); } catch(_) {}
+      if (bodyText !== undefined && bodyText !== null) {
+        return {
+          ok: true,
+          status: res.status || 200,
+          statusText: res.statusText || 'OK',
+          headers: res.headers,
+          json: () => Promise.resolve(JSON.parse(bodyText)),
+          text: () => Promise.resolve(bodyText)
+        };
+      }
       return res;
     } catch(e) {
+      const msg = (e && e.message) ? e.message : String(e || 'Unknown error');
       if (i === retries - 1) throw e;
+      console.warn(`[apiFetch] Attempt ${i + 1}/${retries} failed, retrying...`, msg);
       await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (i + 1)));
     }
   }
@@ -45,13 +74,15 @@ async function loadLibrary() {
     showServerError();
     // Start periodic health checks so app reconnects automatically
     checkServerStatus();
-    // Clear stale cache so we never show outdated demo data
-    localStorage.removeItem('cachedLibrary');
-    songs = [];
-    playlistNames = [];
-    artistMap = {};
-    albumMap = {};
-    renderAll();
+    // DON'T clear existing data — keep showing whatever we have (offline data, cached data)
+    // Only render if we actually have something to show
+    if (songs.length > 0 || Object.keys(artistMap).length > 0) {
+      console.log('[loadLibrary] Keeping existing data for offline viewing');
+      renderAll();
+    } else {
+      // No data at all — try loading from cache as last resort
+      loadCachedLibrary();
+    }
   }
 }
 

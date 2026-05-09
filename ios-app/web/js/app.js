@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     offlineMode = false;
     document.getElementById('offlineBanner').style.display = 'none';
     await fetchApiKey();
-    loadLibrary();
+    loadLibrary().then(cacheLibrary);
     toast('Back online');
   });
   window.addEventListener('offline', () => {
@@ -124,17 +124,37 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Init keyboard shortcuts
   initKeyboard();
 
-  // Load data (non-blocking)
+  // Load data — non-blocking, resilient to server being unreachable
   (async () => {
     try { await initDB(); } catch(e) { console.error('initDB failed:', e); }
+    // Load offline/local data FIRST (always available regardless of server)
     try { await Promise.all([loadOfflineKeys(), loadLikedKeys(), loadHistory()]); } catch(e) { console.error('loadKeys failed:', e); }
-    // Fetch API key from server FIRST so all subsequent API calls are authenticated
-    await fetchApiKey();
-    // Load real library from server
+
+    // Use cached API key immediately so existing requests work
+    const hadCachedKey = !!apiKey;
+    console.log(`[init] Cached API key: ${hadCachedKey ? 'yes' : 'no'}`);
+
+    // Show cached library immediately if available (instant UI)
+    if (hadCachedKey) {
+      loadCachedLibrary();
+    }
+
+    // Try to fetch fresh API key in background (non-blocking)
+    // Even if this fails, the cached key might still work
+    const keyFetched = await fetchApiKey();
+    if (!keyFetched && !hadCachedKey) {
+      console.warn('[init] No API key available — server may be unreachable');
+    }
+
+    // Load fresh library from server
     try {
       await loadLibrary();
+      // Cache successful library load for next time
+      cacheLibrary();
     } catch(e) {
       console.error('loadLibrary failed:', e);
+      // If we didn't already show cached data, try now
+      if (!hadCachedKey) loadCachedLibrary();
     }
   })();
 });
