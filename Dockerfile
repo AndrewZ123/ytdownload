@@ -30,8 +30,8 @@ COPY .env* ./
 
 # Load .env at runtime if present
 
-# Create downloads dir
-RUN mkdir -p /app/downloads
+# Create downloads and data dirs
+RUN mkdir -p /app/downloads /app/data
 
 # Expose port
 EXPOSE 3000

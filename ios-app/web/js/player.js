@@ -117,22 +117,20 @@ async function playSong(song) {
   toast('Song not available offline');
 }
 
-// Stream a YouTube song via server proxy.
-// Two-phase approach to avoid iOS <audio> element timeout:
-//   Phase 1: XHR calls /stream-url to pre-resolve CDN URL on server (60s timeout, bypasses CapacitorHttp).
-//   Phase 2: Set audio.src to proxy URL and play (instant because CDN URL is now cached).
+// Stream a YouTube song via the new architecture:
+//   1. POST /api/play → server resolves with yt-dlp (cached or fresh), returns signed stream URL
+//   2. Set audio.src to the signed stream URL and play
+//   3. Server proxies upstream audio with full HTTP Range support
+//
 // Uses XMLHttpRequest instead of fetch() because CapacitorHttp intercepts fetch()
-// and applies a short native timeout (~10s) that kills long yt-dlp resolves for new songs.
-// XHR is NOT intercepted by CapacitorHttp and gives us explicit timeout control.
+// and applies a short native timeout (~10s). XHR is NOT intercepted by CapacitorHttp
+// and gives us explicit timeout control for potentially slow yt-dlp resolves.
 async function playStreamSong(song) {
   const videoId = song.id;
   console.log('[player] Streaming', videoId, song.title);
 
   // Set loading guard — prevents double-click and togglePlay interference
   _streamLoading = true;
-
-  const proxyUrl = `${API}/api/youtube/stream/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
-  const resolveUrl = `${API}/api/youtube/stream-url/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
 
   // Show loading state in player UI
   updatePlayerUI(false);
@@ -141,68 +139,73 @@ async function playStreamSong(song) {
   const mpSvg = document.getElementById('miniPlayIcon');
   if (mpSvg) { const u = mpSvg.querySelector('use') || mpSvg; u.setAttribute('href', '#icon-pause'); }
 
-  // Phase 1: Pre-resolve CDN URL using XMLHttpRequest (NOT fetch).
-  // XHR bypasses CapacitorHttp entirely — no CORS, no native timeout override.
-  // yt-dlp can take 20-30s for uncached songs, so we set a 60s timeout.
-  let preResolveOk = false;
+  // Phase 1: Call POST /api/play to resolve and get a signed stream URL
+  // Uses XHR to bypass CapacitorHttp's short timeout
+  let playResponse = null;
   try {
     toast('Loading...');
-    console.log('[player] Pre-resolving (XHR)', videoId);
-    await new Promise((resolve, reject) => {
+    console.log('[player] Resolving via POST /play (XHR)', videoId);
+
+    playResponse = await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('GET', resolveUrl, true);
-      xhr.timeout = 60000; // 60 seconds — yt-dlp can be slow for new songs
+      xhr.open('POST', `${API}/api/play`, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.timeout = 60000; // 60s — yt-dlp can be slow for uncached songs
+
       xhr.onload = function() {
         if (xhr.status >= 200 && xhr.status < 300) {
-          console.log('[player] Pre-resolved ✅', videoId, xhr.status);
-          preResolveOk = true;
-          resolve();
+          try {
+            const data = JSON.parse(xhr.responseText);
+            console.log('[player] Resolved ✅', videoId, data.title);
+            resolve(data);
+          } catch(e) {
+            reject(new Error('Invalid response from server'));
+          }
         } else {
-          let errMsg = 'Pre-resolve failed';
+          let errMsg = 'Resolve failed';
           try { errMsg = JSON.parse(xhr.responseText).error || errMsg; } catch(_) {}
-          console.error('[player] Pre-resolve HTTP error', videoId, xhr.status, errMsg);
+          console.error('[player] Resolve HTTP error', videoId, xhr.status, errMsg);
           reject(new Error(errMsg));
         }
       };
       xhr.onerror = function() {
-        console.error('[player] Pre-resolve network error', videoId);
+        console.error('[player] Resolve network error', videoId);
         reject(new Error('Network error'));
       };
       xhr.ontimeout = function() {
-        console.error('[player] Pre-resolve timed out (60s)', videoId);
+        console.error('[player] Resolve timed out (60s)', videoId);
         reject(new Error('Server timed out resolving song'));
       };
-      xhr.send();
+
+      const body = JSON.stringify({ videoId });
+      xhr.send(body);
     });
   } catch(err) {
-    console.error('[player] Pre-resolve failed for', videoId, err.message);
-
-    // Fallback: skip pre-resolve and try the proxy URL directly.
-    // The server will resolve on-the-fly as the audio element reads data.
-    console.log('[player] Trying direct proxy as fallback...', videoId);
+    console.error('[player] Resolve failed for', videoId, err.message);
     _streamLoading = false;
-    audio.src = proxyUrl;
-    try {
-      await audio.play();
-      updatePlayerUI(false);
-      showMiniPlayer();
-      updateFpLikeBtn();
-      prebufferNext();
-      updateNowPlayingInfo();
-      console.log('[player] ✅ Playing (direct fallback)', videoId);
-      return;
-    } catch(fallbackErr) {
-      if (fallbackErr.name === 'AbortError') return;
-      console.error('[player] ❌ Direct fallback also failed', videoId, fallbackErr.message);
-      toast('Could not play this song');
-      audio.src = '';
-      return;
-    }
+    toast('Could not load song: ' + err.message);
+    audio.src = '';
+    return;
   }
 
-  // Phase 2: Set audio.src — server now has the CDN URL cached, so data flows instantly.
+  if (!playResponse || !playResponse.streamUrl) {
+    console.error('[player] No stream URL in response', videoId);
+    _streamLoading = false;
+    toast('Could not get stream URL');
+    audio.src = '';
+    return;
+  }
+
+  // Update song metadata from resolver response (may have better title/artist/duration)
+  if (playResponse.title) song.title = playResponse.title;
+  if (playResponse.artist) song.artist = playResponse.artist;
+  if (playResponse.durationMs) song.duration = playResponse.durationMs / 1000;
+  if (playResponse.artworkUrl) song.coverUrl = playResponse.artworkUrl;
+  updatePlayerUI(false);
+
+  // Phase 2: Set audio.src to the signed stream URL and play
   _streamLoading = false;
-  audio.src = proxyUrl;
+  audio.src = playResponse.streamUrl;
 
   try {
     await audio.play();
@@ -211,9 +214,11 @@ async function playStreamSong(song) {
     updateFpLikeBtn();
     prebufferNext();
     updateNowPlayingInfo();
-    console.log('[player] ✅ Playing', videoId);
+    console.log('[player] ✅ Playing', videoId, playResponse.title);
+
+    // Send listen event
+    sendPlayEvent(videoId, 'start', 0, song);
   } catch(err) {
-    // AbortError is normal if user switched songs before playback started
     if (err.name === 'AbortError') {
       console.log('[player] Playback aborted (user likely switched songs)');
       return;
@@ -255,20 +260,42 @@ async function playOfflineSong(key) {
   } catch(e) { toast('Playback failed'); }
 }
 
+// Pre-resolve the next queue item so playback starts faster when the user skips
 function prebufferNext() {
   if (queue.length === 0) return;
   const nextIdx = (queueIndex + 1) % queue.length;
   if (nextIdx !== queueIndex && queue[nextIdx] && !offlineMode) {
     const nextSong = queue[nextIdx];
-    // YouTube streams: pre-resolve CDN URL so next playback starts instantly
+    // YouTube streams: pre-resolve via POST /play so the resolver cache is warm
     if (nextSong.isStream && nextSong.id) {
-      const resolveUrl = `${API}/api/youtube/stream-url/${nextSong.id}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
-      fetch(resolveUrl).catch(() => {});
-      console.log(`[prebuffer] Pre-resolving ${nextSong.id}`);
+      console.log(`[prebuffer] Pre-resolving ${nextSong.id} via POST /play`);
+      fetch(`${API}/api/play`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId: nextSong.id }),
+      }).catch(() => {});
       return;
     }
     try { const a = new Audio(); a.src = audioUrl(nextSong); a.preload = 'auto'; prebufferedSong = nextSong; } catch(e) {}
   }
+}
+
+// Send a listen event to the server for analytics/recommendations
+function sendPlayEvent(videoId, eventType, positionMs, song) {
+  try {
+    fetch(`${API}/api/events/listen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        videoId,
+        eventType,         // start, progress, skip, complete, replay, like
+        positionMs: Math.round(positionMs || 0),
+        playedMs: Math.round((audio.currentTime || 0) * 1000),
+        title: song?.title || '',
+        artist: song?.artist || '',
+      }),
+    }).catch(() => {}); // fire-and-forget
+  } catch(e) {}
 }
 
 // Audio event listeners

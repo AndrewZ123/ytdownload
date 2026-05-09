@@ -87,6 +87,10 @@ const deps = {
   isWarpAvailable: utils.isWarpAvailable,
 };
 
+// ==================== Initialize New Streaming Modules ====================
+const resolver = require('./lib/resolver');
+const events = require('./lib/events');
+
 // ==================== Load Route Modules ====================
 require('./routes/download')(app, deps);
 require('./routes/spotify')(app, deps);
@@ -97,10 +101,22 @@ require('./routes/discovery')(app, deps);
 require('./routes/music-api')(app, deps);
 require('./routes/streaming')(app, deps);
 
+// ==================== Graceful Shutdown ====================
+process.on('SIGTERM', () => {
+  console.log('[server] SIGTERM received, shutting down...');
+  process.exit(0);
+});
+process.on('SIGINT', () => {
+  console.log('[server] SIGINT received, shutting down...');
+  process.exit(0);
+});
+
 // ==================== Start Server ====================
 app.listen(PORT, () => {
   console.log(`🎵 YouTube Music Downloader`);
   console.log(`   Open http://localhost:${PORT}`);
   console.log(`   🎧 Music Player: http://localhost:${PORT}/player`);
   console.log(`   API Key: ${config.apiKey}`);
+  console.log(`   🔄 Resolver cache initialized (TTL: ${resolver.getStats().ttl}s)`);
+  console.log(`   📊 Events DB initialized (${events.getListenStats().totalEvents} historical events)`);
 });
