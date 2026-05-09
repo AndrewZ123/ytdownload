@@ -3,6 +3,7 @@ downloads/
 config.json
 .DS_Store
 *.log
+.env
 
 # iOS build artifacts
 ios-app/ios/App/App.xcarchive/

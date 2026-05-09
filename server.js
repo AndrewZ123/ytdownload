@@ -3,6 +3,15 @@ const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 
+// Load .env file (keep secrets out of git)
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
+    const match = line.match(/^([A-Z_]+)=(.*)$/);
+    if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim();
+  });
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 

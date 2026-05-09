@@ -55,6 +55,15 @@ sudo docker build -t ytmusic .
 # 5. Create persistent data directory
 sudo mkdir -p /opt/ytmusic-data
 
+# 5b. Create .env file for secrets (API keys etc - NOT in git)
+if [ ! -f /opt/ytmusic/.env ]; then
+  sudo tee /opt/ytmusic/.env > /dev/null << 'ENVEOF'
+# YouTube Data API key (get from https://console.cloud.google.com/apis/credentials)
+YT_API_KEY=REPLACE_WITH_YOUR_KEY
+ENVEOF
+  echo "⚠️  Edit /opt/ytmusic/.env and add your YouTube API key!"
+fi
+
 # 6. Open port 3000 in iptables (Oracle Cloud Ubuntu blocks it by default!)
 echo ""
 echo "🔓 Opening port 3000 in iptables (Oracle Cloud requires this)..."
@@ -76,7 +85,7 @@ Requires=docker.service
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=/usr/bin/docker run --name ytmusic --rm --network host -v /opt/ytmusic-data:/app/downloads ytmusic
+ExecStart=/usr/bin/docker run --name ytmusic --rm --network host -v /opt/ytmusic-data:/app/downloads -v /opt/ytmusic/.env:/app/.env:ro ytmusic
 ExecStop=/usr/bin/docker stop ytmusic
 
 [Install]

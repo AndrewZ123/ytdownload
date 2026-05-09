@@ -318,7 +318,7 @@ app.post('/api/music/add', (req, res) => {
 });
 
 // ==================== YouTube Data API Search ====================
-const YT_API_KEY = 'AIzaSyDIfpfOC-iA5Tn-hOzsXjNOvISh0BicxUU';
+const YT_API_KEY = process.env.YT_API_KEY || '';
 
 // Search cache: 5-minute TTL to avoid repeated API calls for same query
 const searchCache = new Map();
