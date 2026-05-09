@@ -1,5 +1,12 @@
 // ===== PLAYER =====
+let _streamLoading = false; // Guard against double-click during stream resolve
+
 function togglePlay() {
+  // Don't try to play while a stream is still resolving
+  if (_streamLoading) {
+    console.log('[player] Ignoring play toggle — stream is loading');
+    return;
+  }
   if (audio.paused) audio.play().catch(() => {});
   else audio.pause();
   hapticImpact('LIGHT');
@@ -112,35 +119,89 @@ async function playSong(song) {
 
 // Stream a YouTube song via server proxy.
 // Two-phase approach to avoid iOS <audio> element timeout:
-//   Phase 1: fetch() calls /stream-url to pre-resolve CDN URL on server (patient, no timeout).
+//   Phase 1: XHR calls /stream-url to pre-resolve CDN URL on server (60s timeout, bypasses CapacitorHttp).
 //   Phase 2: Set audio.src to proxy URL and play (instant because CDN URL is now cached).
+// Uses XMLHttpRequest instead of fetch() because CapacitorHttp intercepts fetch()
+// and applies a short native timeout (~10s) that kills long yt-dlp resolves for new songs.
+// XHR is NOT intercepted by CapacitorHttp and gives us explicit timeout control.
 async function playStreamSong(song) {
   const videoId = song.id;
   console.log('[player] Streaming', videoId, song.title);
 
+  // Set loading guard — prevents double-click and togglePlay interference
+  _streamLoading = true;
+
   const proxyUrl = `${API}/api/youtube/stream/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
   const resolveUrl = `${API}/api/youtube/stream-url/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
 
-  // Phase 1: Pre-resolve the CDN URL via fetch() (no audio timeout pressure).
-  // This triggers yt-dlp on the server and caches the result. fetch() is patient.
-  // Subsequent plays of the same song skip this step because the CDN URL is cached.
+  // Show loading state in player UI
+  updatePlayerUI(false);
+  const fpSvg = document.getElementById('fpPlayIcon');
+  if (fpSvg) { const u = fpSvg.querySelector('use') || fpSvg; u.setAttribute('href', '#icon-pause'); }
+  const mpSvg = document.getElementById('miniPlayIcon');
+  if (mpSvg) { const u = mpSvg.querySelector('use') || mpSvg; u.setAttribute('href', '#icon-pause'); }
+
+  // Phase 1: Pre-resolve CDN URL using XMLHttpRequest (NOT fetch).
+  // XHR bypasses CapacitorHttp entirely — no CORS, no native timeout override.
+  // yt-dlp can take 20-30s for uncached songs, so we set a 60s timeout.
+  let preResolveOk = false;
   try {
     toast('Loading...');
-    console.log('[player] Pre-resolving', videoId);
-    const res = await fetch(resolveUrl);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Pre-resolve failed');
-    }
-    console.log('[player] Pre-resolved ✅', videoId);
+    console.log('[player] Pre-resolving (XHR)', videoId);
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', resolveUrl, true);
+      xhr.timeout = 60000; // 60 seconds — yt-dlp can be slow for new songs
+      xhr.onload = function() {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          console.log('[player] Pre-resolved ✅', videoId, xhr.status);
+          preResolveOk = true;
+          resolve();
+        } else {
+          let errMsg = 'Pre-resolve failed';
+          try { errMsg = JSON.parse(xhr.responseText).error || errMsg; } catch(_) {}
+          console.error('[player] Pre-resolve HTTP error', videoId, xhr.status, errMsg);
+          reject(new Error(errMsg));
+        }
+      };
+      xhr.onerror = function() {
+        console.error('[player] Pre-resolve network error', videoId);
+        reject(new Error('Network error'));
+      };
+      xhr.ontimeout = function() {
+        console.error('[player] Pre-resolve timed out (60s)', videoId);
+        reject(new Error('Server timed out resolving song'));
+      };
+      xhr.send();
+    });
   } catch(err) {
     console.error('[player] Pre-resolve failed for', videoId, err.message);
-    toast('Could not load song');
-    audio.src = '';
-    return;
+
+    // Fallback: skip pre-resolve and try the proxy URL directly.
+    // The server will resolve on-the-fly as the audio element reads data.
+    console.log('[player] Trying direct proxy as fallback...', videoId);
+    _streamLoading = false;
+    audio.src = proxyUrl;
+    try {
+      await audio.play();
+      updatePlayerUI(false);
+      showMiniPlayer();
+      updateFpLikeBtn();
+      prebufferNext();
+      updateNowPlayingInfo();
+      console.log('[player] ✅ Playing (direct fallback)', videoId);
+      return;
+    } catch(fallbackErr) {
+      if (fallbackErr.name === 'AbortError') return;
+      console.error('[player] ❌ Direct fallback also failed', videoId, fallbackErr.message);
+      toast('Could not play this song');
+      audio.src = '';
+      return;
+    }
   }
 
   // Phase 2: Set audio.src — server now has the CDN URL cached, so data flows instantly.
+  _streamLoading = false;
   audio.src = proxyUrl;
 
   try {

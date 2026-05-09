@@ -107,6 +107,13 @@ function renderSearchHistory(el) {
 function playSearchResult(idx) {
   const r = window._searchResults?.[idx];
   if (!r) return;
+
+  // Guard: if a stream is already loading, ignore additional clicks
+  if (typeof _streamLoading !== 'undefined' && _streamLoading) {
+    console.log('[search] Ignoring click — stream already loading');
+    return;
+  }
+
   const videoId = r.id || '';
 
   // Create a temporary song object for streaming
