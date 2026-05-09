@@ -111,7 +111,9 @@ async function playSong(song) {
 }
 
 // Stream a YouTube song via server proxy (reliable, CORS-safe for iOS WKWebView)
-// Server handles caching + deduplication so we just hit the proxy endpoint directly.
+// Two-phase approach: pre-resolve CDN URL via fetch(), then stream directly via Audio element.
+// Phase 1: fetch() triggers yt-dlp resolve (slow ~15s) — goes through CapacitorHttp, always works.
+// Phase 2: Audio.src hits the same endpoint which now has the CDN URL cached → instant response.
 async function playStreamSong(song) {
   const videoId = song.id;
   console.log('[player] Streaming', videoId, song.title);
@@ -119,18 +121,31 @@ async function playStreamSong(song) {
   const MAX_ATTEMPTS = 3;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      // Stream through server proxy — server resolves yt-dlp once and caches
+      // Phase 1: Pre-resolve the stream URL so the server caches the CDN URL
+      // This is the slow part (~15s for yt-dlp) — uses fetch() which CapacitorHttp intercepts reliably
+      const preResolveUrl = `${API}/api/youtube/stream-url/${videoId}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
+      console.log(`[player] Pre-resolving ${videoId} (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const preRes = await fetch(preResolveUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!preRes.ok) throw new Error(`Pre-resolve HTTP ${preRes.status}`);
+      const preData = await preRes.json();
+      if (!preData.streamUrl) throw new Error('No stream URL in pre-resolve response');
+      console.log(`[player] Pre-resolved ${videoId} ✅ (cached=${preData.cached})`);
+
+      // Phase 2: Now set Audio.src — server has CDN URL cached, will respond with audio data quickly
       const proxyUrl = ytStreamUrl(videoId);
-      console.log(`[player] Proxy play attempt ${attempt + 1}/${MAX_ATTEMPTS}`);
       audio.src = proxyUrl;
 
-      // Wait for play or timeout (20s for first attempt to allow yt-dlp resolve, shorter for retries)
-      const timeoutMs = attempt === 0 ? 20000 : 10000;
+      // Wait for play or timeout (shorter now since CDN URL is cached)
       const playPromise = audio.play();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Play timeout')), timeoutMs)
+      const playTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Play timeout')), 10000)
       );
-      await Promise.race([playPromise, timeoutPromise]);
+      await Promise.race([playPromise, playTimeout]);
 
       updatePlayerUI(false);
       showMiniPlayer();
@@ -146,7 +161,7 @@ async function playStreamSong(song) {
 
       audio.src = '';
       if (attempt < MAX_ATTEMPTS - 1) {
-        await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
       }
     }
   }
@@ -191,9 +206,16 @@ function prebufferNext() {
   if (queue.length === 0) return;
   const nextIdx = (queueIndex + 1) % queue.length;
   if (nextIdx !== queueIndex && queue[nextIdx] && !offlineMode) {
-    // Skip prebuffer for YouTube streams (they're proxied and instant)
-    if (queue[nextIdx].isStream) return;
-    try { const a = new Audio(); a.src = audioUrl(queue[nextIdx]); a.preload = 'auto'; prebufferedSong = queue[nextIdx]; } catch(e) {}
+    const nextSong = queue[nextIdx];
+    // YouTube streams: pre-resolve CDN URL via fetch so next playback is instant
+    if (nextSong.isStream && nextSong.id) {
+      const preUrl = `${API}/api/youtube/stream-url/${nextSong.id}${apiKey ? '?apiKey=' + encodeURIComponent(apiKey) : ''}`;
+      fetch(preUrl).then(r => r.json()).then(d => {
+        if (d.streamUrl) console.log(`[prebuffer] Pre-resolved ${nextSong.id} ✅`);
+      }).catch(() => {});
+      return;
+    }
+    try { const a = new Audio(); a.src = audioUrl(nextSong); a.preload = 'auto'; prebufferedSong = nextSong; } catch(e) {}
   }
 }
 
