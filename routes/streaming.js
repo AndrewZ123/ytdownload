@@ -273,6 +273,136 @@ module.exports = function(app, deps) {
     }
   });
 
+  // ==================== SEARCH ====================
+  // Lightweight YouTube search using yt-dlp flat-playlist (metadata only, no audio resolve).
+  // This keeps search fast — audio is resolved later when the user taps play.
+
+  const { execFile } = require('child_process');
+
+  app.get('/api/music/search', (req, res) => {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.status(400).json({ error: 'q parameter required' });
+
+    const maxResults = Math.min(parseInt(req.query.max) || 10, 30);
+    const searchUrl = `ytsearch${maxResults}:${q}`;
+
+    execFile('yt-dlp', ['--no-warnings', '-J', '--flat-playlist', searchUrl],
+      { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }, (err, stdout) => {
+        if (err) {
+          console.error('[search] yt-dlp search error:', err.message);
+          return res.status(502).json({ error: 'Search failed', details: err.message });
+        }
+        try {
+          const data = JSON.parse(stdout);
+          const entries = (data.entries || []).filter(e => e && e.title).map(e => ({
+            id: e.id || e.url || '',
+            title: e.title || 'Unknown',
+            channel: e.uploader || e.channel || '',
+            duration: e.duration || null,
+            durationFormatted: e.duration ? `${Math.floor(e.duration / 60)}:${(e.duration % 60).toString().padStart(2, '0')}` : null,
+            thumbnail: (e.thumbnails && e.thumbnails.length > 0)
+              ? (e.thumbnails.find(t => t.width >= 200 && t.width <= 400) || e.thumbnails[e.thumbnails.length - 1]).url
+              : (e.id ? `https://img.youtube.com/vi/${e.id}/mqdefault.jpg` : ''),
+          }));
+          res.json({ results: entries, query: q, count: entries.length });
+        } catch (parseErr) {
+          console.error('[search] JSON parse error:', parseErr.message);
+          res.status(502).json({ error: 'Failed to parse search results' });
+        }
+      });
+  });
+
+  // ==================== YOUTUBE INFO ====================
+  // Lightweight metadata lookup for a single video (no audio resolve).
+  // Used by the client for background metadata enrichment after search.
+
+  app.get('/api/youtube/info/:videoId', (req, res) => {
+    const { videoId } = req.params;
+    if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+      return res.status(400).json({ error: 'Valid videoId required' });
+    }
+
+    // Check resolver cache first
+    const cached = resolver.getFreshResolution(videoId);
+    if (cached) {
+      return res.json({
+        videoId,
+        title: cached.title,
+        artist: cached.artist,
+        duration: cached.duration,
+        thumbnail: cached.thumbnail,
+        cached: true,
+      });
+    }
+
+    // Not cached — do a lightweight yt-dlp info extraction (no download)
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    execFile('yt-dlp', ['--no-warnings', '-J', '--flat-playlist', url],
+      { maxBuffer: 10 * 1024 * 1024, timeout: 15000 }, (err, stdout) => {
+        if (err) {
+          return res.status(502).json({ error: 'Could not fetch video info', details: err.message });
+        }
+        try {
+          const data = JSON.parse(stdout);
+          const entry = data.entries ? data.entries[0] : data;
+          res.json({
+            videoId,
+            title: entry.title || '',
+            artist: entry.uploader || entry.channel || '',
+            duration: entry.duration || null,
+            thumbnail: (entry.thumbnails && entry.thumbnails.length > 0)
+              ? (entry.thumbnails.find(t => t.width >= 200 && t.width <= 400) || entry.thumbnails[entry.thumbnails.length - 1]).url
+              : `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+            cached: false,
+          });
+        } catch (parseErr) {
+          res.status(502).json({ error: 'Failed to parse video info' });
+        }
+      });
+  });
+
+  // ==================== STREAM URL (pre-cache helper) ====================
+  // Resolves a stream URL for pre-caching purposes.
+  // Returns a POST /play-compatible signed stream URL without logging a start event.
+
+  app.get('/api/youtube/stream-url/:videoId', async (req, res) => {
+    const { videoId } = req.params;
+    if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+      return res.status(400).json({ error: 'Valid videoId required' });
+    }
+
+    try {
+      const resolution = await resolver.resolve(videoId);
+      if (!resolution || !resolution.upstreamUrl) {
+        return res.status(502).json({ error: 'No audio stream found', videoId });
+      }
+
+      const host = getHost(req);
+      const tokenData = playTokens.createToken({
+        videoId: resolution.sourceId,
+        title: resolution.title,
+        artist: resolution.artist,
+        artworkUrl: resolution.thumbnail,
+        durationMs: (resolution.duration || 0) * 1000,
+        audioMime: resolution.audioMime,
+        contentLength: resolution.contentLength,
+      }, host);
+
+      res.json({
+        videoId,
+        streamUrl: tokenData.streamUrl,
+        streamExpiresAt: tokenData.expiresAt,
+        title: resolution.title,
+        artist: resolution.artist,
+        duration: resolution.duration,
+        thumbnail: resolution.thumbnail,
+      });
+    } catch (err) {
+      console.error(`[stream-url] Resolve failed for ${videoId}:`, err.message);
+      res.status(502).json({ error: 'Could not resolve stream URL', details: err.message });
+    }
+  });
+
   // ==================== LEGACY COMPATIBILITY ====================
   // These endpoints are kept so the existing music-api.js search results
   // and other parts of the app don't break during the transition.
