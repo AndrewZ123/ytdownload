@@ -9,6 +9,7 @@ module.exports = function(app, deps) {
 const { config, downloadsDir, buildDownloadArgs, getAudioFiles, sanitize, AUDIO_EXTS, saveConfig, hashStr, getLibraryCache, setLibraryCache, clearLibraryCache, isLibraryCacheValid } = deps;
 
 // ==================== Music Library API ====================
+// NOTE: Search, proxy/image, youtube/info are handled in routes/streaming.js
 
 // Library cache and hashStr are provided by shared utils
 

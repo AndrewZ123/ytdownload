@@ -2,6 +2,10 @@
 let searchDebounce = null;
 let searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
 
+// Client-side search cache (30 min) — avoids hitting server for repeated queries
+const _searchCache = new Map();
+const SEARCH_CACHE_TTL = 30 * 60 * 1000;
+
 function onSearchInput(el) {
   clearTimeout(searchDebounce);
   searchDebounce = setTimeout(() => doSearch(el.value), 300);
@@ -12,57 +16,79 @@ async function doSearch(q) {
   const el = document.getElementById('searchPageResults');
   if (!el) return;
   if (!q) { renderSearchHistory(el); return; }
+
+  // Check client-side cache first (saves server round-trip + API credits)
+  const cacheKey = q.toLowerCase();
+  const cached = _searchCache.get(cacheKey);
+  if (cached && Date.now() - cached.time < SEARCH_CACHE_TTL) {
+    console.log('[search] Client cache hit for:', q);
+    renderSearchResults(el, cached.results, q);
+    return;
+  }
+
   el.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Searching YouTube...</p></div>';
   try {
     const res = await apiFetch(`${API}/api/music/search?q=${encodeURIComponent(q)}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+    }
     const data = await res.json();
     const results = data.results || data || [];
-    if (results.length === 0) {
-      el.innerHTML = '<div class="empty-state"><h3>No Results</h3><p>Try a different search term</p></div>';
-      return;
-    }
-    // Store results for play/download actions
-    window._searchResults = results;
 
-    el.innerHTML = results.map((r, i) => {
-      const videoId = r.id || '';
-      const rawThumb = r.thumbnail || (videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : '');
-      const thumbUrl = rawThumb ? urlWithKey(`${API}/api/proxy/image?url=${encodeURIComponent(rawThumb)}`) : '';
-      const duration = r.durationFormatted || (r.duration ? `${Math.floor(r.duration / 60)}:${(r.duration % 60).toString().padStart(2, '0')}` : '');
+    // Store in client-side cache
+    _searchCache.set(cacheKey, { results, time: Date.now() });
 
-      return `<div class="search-result-item" onclick="playSearchResult(${i})" role="button" aria-label="Play ${r.title || 'Untitled'}">
-        <div class="search-result-thumb"${thumbUrl ? ` style="background-image:url('${thumbUrl}')"` : ''}>
-          ${duration ? `<span class="search-result-duration">${duration}</span>` : ''}
-          <button class="search-play-btn" onclick="event.stopPropagation();playSearchResult(${i})" aria-label="Play">
-            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </button>
-        </div>
-        <div class="search-result-info">
-          <div class="search-result-title">${r.title || 'Untitled'}</div>
-          <div class="search-result-channel">${r.channel || ''}</div>
-        </div>
-        <button class="search-dl-btn" onclick="event.stopPropagation();downloadResult(${i})" aria-label="Download to library" title="Download">
-          <svg class="icon-sm"><use href="#icon-download"/></svg>
-        </button>
-      </div>`;
-    }).join('');
-
-    // Save search history
-    if (!searchHistory.includes(q)) {
-      searchHistory.unshift(q);
-      searchHistory = searchHistory.slice(0, 10);
-      localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
-    }
-
-    // Pre-cache stream URLs for top results (background, non-blocking)
-    results.slice(0, 3).forEach(r => {
-      if (r.id) preCacheStreamUrl(r.id);
-    });
+    renderSearchResults(el, results, q);
   } catch(e) {
-    console.error('Search failed:', e);
-    el.innerHTML = '<div class="empty-state"><h3>Search Failed</h3><p>Check your connection</p></div>';
+    console.error('Search failed:', e.message || e);
+    el.innerHTML = '<div class="empty-state"><h3>Search Failed</h3><p>' + (e.message || 'Check your connection') + '</p></div>';
   }
+}
+
+// Render search results into a container element
+function renderSearchResults(el, results, query) {
+  if (results.length === 0) {
+    el.innerHTML = '<div class="empty-state"><h3>No Results</h3><p>Try a different search term</p></div>';
+    return;
+  }
+  // Store results for play/download actions
+  window._searchResults = results;
+
+  el.innerHTML = results.map((r, i) => {
+    const videoId = r.id || '';
+    const rawThumb = r.thumbnail || (videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : '');
+    const thumbUrl = rawThumb ? urlWithKey(`${API}/api/proxy/image?url=${encodeURIComponent(rawThumb)}`) : '';
+    const duration = r.durationFormatted || (r.duration ? `${Math.floor(r.duration / 60)}:${(r.duration % 60).toString().padStart(2, '0')}` : '');
+
+    return `<div class="search-result-item" onclick="playSearchResult(${i})" role="button" aria-label="Play ${r.title || 'Untitled'}">
+      <div class="search-result-thumb"${thumbUrl ? ` style="background-image:url('${thumbUrl}')"` : ''}>
+        ${duration ? `<span class="search-result-duration">${duration}</span>` : ''}
+        <button class="search-play-btn" onclick="event.stopPropagation();playSearchResult(${i})" aria-label="Play">
+          <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+      </div>
+      <div class="search-result-info">
+        <div class="search-result-title">${r.title || 'Untitled'}</div>
+        <div class="search-result-channel">${r.channel || ''}</div>
+      </div>
+      <button class="search-dl-btn" onclick="event.stopPropagation();downloadResult(${i})" aria-label="Download to library" title="Download">
+        <svg class="icon-sm"><use href="#icon-download"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+
+  // Save search history
+  if (query && !searchHistory.includes(query)) {
+    searchHistory.unshift(query);
+    searchHistory = searchHistory.slice(0, 10);
+    localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+  }
+
+  // Pre-cache stream URLs for top results (background, non-blocking)
+  results.slice(0, 3).forEach(r => {
+    if (r.id) preCacheStreamUrl(r.id);
+  });
 }
 
 function renderSearchHistory(el) {
@@ -168,10 +194,28 @@ async function downloadResult(idx) {
   }
 }
 
+// Client-side stream URL cache for instant playback
+const _streamUrlCache = new Map();
+
+// Fetch and cache a stream URL for a video (used for pre-caching and playback)
+async function fetchStreamUrl(videoId) {
+  if (!videoId) return null;
+  if (_streamUrlCache.has(videoId)) return _streamUrlCache.get(videoId);
+  try {
+    const res = await apiFetch(`${API}/api/youtube/stream-url/${videoId}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.streamUrl) {
+      _streamUrlCache.set(videoId, data.streamUrl);
+      return data.streamUrl;
+    }
+  } catch(e) {}
+  return null;
+}
+
 // --- Pre-cache stream URL for faster playback ---
 function preCacheStreamUrl(videoId) {
   if (!videoId) return;
-  // Use fetchStreamUrl which caches the CDN URL client-side
   fetchStreamUrl(videoId).catch(() => {}); // silent - this is just a prefetch
 }
 
