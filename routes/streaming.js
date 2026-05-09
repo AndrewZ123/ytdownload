@@ -174,8 +174,8 @@ app.get('/api/youtube/stream/:videoId', async (req, res) => {
     };
     if (range) fetchHeaders['Range'] = range;
 
-    // Fetch CDN directly (no WARP — CDN URLs are public, WARP would slow it down)
-    const cdnRes = await fetchWithRedirects(cdnUrl, fetchHeaders, 5, 30000, false);
+    // Fetch CDN through WARP — YouTube CDN URLs are IP-bound (resolved through WARP, must fetch through WARP too)
+    const cdnRes = await fetchWithRedirects(cdnUrl, fetchHeaders, 5, 30000, true);
 
     if (cdnRes.statusCode >= 400) {
       cdnRes.resume();
