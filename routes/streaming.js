@@ -308,9 +308,9 @@ app.post('/api/music/add', (req, res) => {
 // ==================== YouTube Data API Search ====================
 const YT_API_KEY = process.env.YT_API_KEY || '';
 
-// Search cache: 5-minute TTL to avoid repeated API calls for same query
+// Search cache: 30-minute TTL to minimize YouTube API credit usage
 const searchCache = new Map();
-const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const SEARCH_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 // Helper: make a JSON GET request
 function fetchJSON(url) {
@@ -413,7 +413,7 @@ app.get('/api/music/search', async (req, res) => {
     searchCache.set(cacheKey, { results, time: Date.now() });
 
     // Prune old cache entries periodically
-    if (searchCache.size > 100) {
+    if (searchCache.size > 200) {
       const now = Date.now();
       for (const [key, val] of searchCache) {
         if (now - val.time > SEARCH_CACHE_TTL) searchCache.delete(key);

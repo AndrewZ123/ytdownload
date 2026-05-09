@@ -26,6 +26,9 @@ COPY server.js .
 COPY lib/ ./lib/
 COPY routes/ ./routes/
 COPY public/ ./public/
+COPY .env* ./
+
+# Load .env at runtime if present
 
 # Create downloads dir
 RUN mkdir -p /app/downloads
