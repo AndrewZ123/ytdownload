@@ -169,7 +169,12 @@ app.get('/api/youtube/stream/:videoId', async (req, res) => {
       'Accept': '*/*',
       'Accept-Encoding': 'identity',
     };
-    if (req.headers.range) reqHeaders['Range'] = req.headers.range;
+    if (req.headers.range) {
+      // YouTube CDN rejects exact end byte ranges (e.g. bytes=0-51200 → 416)
+      // but accepts open-ended ranges (e.g. bytes=0- → 206). Convert accordingly.
+      const convertedRange = req.headers.range.replace(/bytes=(\d+)-\d+/, 'bytes=$1-');
+      reqHeaders['Range'] = convertedRange;
+    }
 
     const cdnRes = await fetchWithRedirects(cdnUrl, reqHeaders);
 
