@@ -1,6 +1,11 @@
 // ===== CONFIG =====
-// Oracle Cloud server — hardcoded, never changeable
-const API = 'http://157.151.254.26:3000';
+// HTTPS domain — update this when you set up a domain + SSL certificate.
+// Format: https://your-domain.com (NO trailing slash, NO port)
+//
+// To set up HTTPS on the Oracle server, run: ./setup-https.sh your-domain.com
+// Then update this constant and rebuild the app.
+const API = 'https://melodia.ddns.net';
+
 const APP_NAME = 'Melodia';
 const HISTORY_LIMIT = 50;
 const DB_NAME = 'MelodiaDB';

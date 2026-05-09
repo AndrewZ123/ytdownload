@@ -24,9 +24,14 @@ const events = require('../lib/events');
 
 /**
  * Determine the base URL for stream URLs based on the request.
+ * Handles nginx reverse proxy (X-Forwarded-Proto, X-Forwarded-Host).
  */
 function getHost(req) {
-  const protocol = req.protocol || 'http';
+  // When behind nginx with proxy_set_header X-Forwarded-Proto $scheme,
+  // use the forwarded protocol (https) instead of the internal http
+  const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+  // When behind nginx with proxy_set_header Host $host,
+  // the Host header is already the public domain
   const host = req.get('host') || req.headers.host || 'localhost:3000';
   return `${protocol}://${host}`;
 }

@@ -13,6 +13,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const app = express();
+app.enable('trust proxy'); // Trust nginx reverse proxy for X-Forwarded-Proto/Host
 const PORT = process.env.PORT || 3000;
 
 // ==================== Config ====================
