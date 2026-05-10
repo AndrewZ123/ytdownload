@@ -1,6 +1,7 @@
 // ===== PLAYER =====
 let _streamLoading = false; // Guard against double-click during stream resolve
 let _retryCount = 0;        // Automatic retry counter (max 1)
+let _targetVideoId = null;  // Track which song we're trying to play (filters stale errors)
 const MAX_RETRY = 1;
 
 // Stream token state for diagnostics and recovery
@@ -106,7 +107,17 @@ function setPlaybackSpeed(speed) {
 
 async function playSong(song) {
   if (!song) return;
+
+  // Immediately stop current playback when switching to a new song.
+  // This prevents the old song from continuing to play while the new one resolves.
+  const isSwitchingSongs = currentSong && currentSong !== song;
+  if (isSwitchingSongs) {
+    console.log('[player] Switching from', currentSong.title, '→', song.title);
+    audio.pause();
+  }
+
   currentSong = song;
+  _targetVideoId = song.id || null; // Track target for error filtering
   addToHistory(song);
   updatePlayerUI(false);
   showMiniPlayer();
@@ -254,6 +265,13 @@ async function playStreamSong(song) {
 
   // Phase 2: Set audio.src to the signed stream URL and play
   _streamLoading = false;
+
+  // Skip if user already switched to a different song while we were resolving
+  if (_targetVideoId !== videoId) {
+    console.log('[player] Stale resolve for', videoId, '— user switched to', _targetVideoId);
+    return;
+  }
+
   audio.src = playResponse.streamUrl;
 
   try {
@@ -270,6 +288,8 @@ async function playStreamSong(song) {
   } catch(err) {
     if (err.name === 'AbortError') {
       console.log('[player] Playback aborted (user likely switched songs)');
+      // Try one more play — iOS sometimes aborts when switching src mid-playback
+      try { await audio.play(); } catch(_) {}
       return;
     }
     console.error('[player] ❌ Stream failed for', videoId, err.name, err.message);
@@ -457,6 +477,19 @@ audio.addEventListener('error', async () => {
   const codeNames = { 1: 'ABORTED', 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' };
   const errName = codeNames[code] || 'UNKNOWN';
   console.warn(`[player] Audio error: ${errName} (code=${code})`, msg || '');
+
+  // Ignore ABORTED errors — these are expected when switching songs (src changes mid-playback)
+  if (code === 1) {
+    console.log('[player] Ignoring ABORTED error — likely from song switch');
+    return;
+  }
+
+  // Ignore errors for stale songs (user already switched to a different song)
+  const errorVideoId = _streamState.videoId || (currentSong && currentSong.id);
+  if (errorVideoId && _targetVideoId && errorVideoId !== _targetVideoId) {
+    console.log('[player] Ignoring error for stale song', errorVideoId, '— current target is', _targetVideoId);
+    return;
+  }
 
   // Log to server for diagnostics
   _logPlaybackError(code, msg);
