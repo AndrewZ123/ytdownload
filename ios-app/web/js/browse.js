@@ -203,7 +203,7 @@ function buildDiscoverCard(item) {
   
   return `<div class="card discover-card" data-video-id="${videoId}">
     <div class="card-art discover-card-art">
-      ${thumbUrl ? `<img src="${urlWithKey(API + '/api/proxy/image?url=' + encodeURIComponent(thumbUrl))}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="discover-placeholder-art">🎵</div>`}
+      ${thumbUrl ? `<img src="${urlWithKey(API + '/api/proxy/image?url=' + encodeURIComponent(thumbUrl))}" alt="" loading="lazy" onerror="onImageError(this)">` : `<div class="discover-placeholder-art">🎵</div>`}
       ${duration ? `<span class="discover-duration">${duration}</span>` : ''}
       <button class="discover-play-btn" onclick="event.stopPropagation();playDiscoverSong('${videoId}','${title.replace(/'/g, "\\'")}')">
         <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -357,7 +357,7 @@ function refreshDiscover() {
 function browseCardHTML(s, context) {
   const k = songKey(s);
   return `<div class="card" onclick="playSongFromList('${k}','${context}')">
-    <div class="card-art"><img src="${coverUrl(s)}" alt="" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-art"><img src="${coverUrl(s)}" alt="" loading="lazy" onerror="onImageError(this)"></div>
     <div class="card-title">${s.title||''}</div>
     <div class="card-sub">${s.artist||''}</div>
   </div>`;
@@ -376,7 +376,7 @@ function browseAlbumCardHTML(name) {
   const aSongs = albumMap[name]||[];
   const first = aSongs[0];
   return `<div class="card" onclick="openAlbum('${name.replace(/'/g,"\\'")}')">
-    <div class="card-art"><img src="${first?coverUrl(first):''}" alt="" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-art"><img src="${first?coverUrl(first):_placeholderSvg}" alt="" loading="lazy" onerror="onImageError(this)"></div>
     <div class="card-title">${name}</div>
     <div class="card-sub">${aSongs.length} song${aSongs.length!==1?'s':''}</div>
   </div>`;

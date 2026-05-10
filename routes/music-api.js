@@ -58,6 +58,14 @@ function scanLibrary(callback) {
               } catch (_) {}
             }
 
+            // Extract YouTube video ID from filename if present (yt-dlp embeds it)
+            // Format: "Title [videoId].mp3" or "Title (videoId).mp3"
+            let videoId = '';
+            const videoIdMatch = f.match(/\[([a-zA-Z0-9_-]{11})\]|\(([a-zA-Z0-9_-]{11})\)/);
+            if (videoIdMatch) {
+              videoId = videoIdMatch[1] || videoIdMatch[2];
+            }
+
             const song = {
               id: songId,
               title,
@@ -69,6 +77,7 @@ function scanLibrary(callback) {
               addedAt: stat.mtime,
               playlist: dir.name,
               file: f,
+              videoId, // Store YouTube video ID for thumbnail fetching
               coverUrl: `/api/music/cover/${encodeURIComponent(dir.name)}/${encodeURIComponent(f)}`
             };
 
@@ -190,6 +199,7 @@ app.get('/api/music/cover/:playlist/:file', (req, res) => {
   const filePath = path.join(downloadsDir, playlist, file);
 
   if (!fs.existsSync(filePath)) {
+    console.log(`[cover] File not found: ${playlist}/${file}`);
     // Return SVG placeholder for missing files
     res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
     return res.end(generatePlaceholder(file));
@@ -208,6 +218,7 @@ app.get('/api/music/cover/:playlist/:file', (req, res) => {
       return fs.createReadStream(coverPath).pipe(res);
     }
     // Cached file is too small (probably old 1x1 pixel), delete it
+    console.log(`[cover] Invalid cache (too small): ${playlist}/${file}, deleting...`);
     fs.unlinkSync(coverPath);
   }
 
@@ -217,67 +228,67 @@ app.get('/api/music/cover/:playlist/:file', (req, res) => {
   const thumbPng = path.join(downloadsDir, playlist, parsed.name + '.png');
   const thumbWebp = path.join(downloadsDir, playlist, parsed.name + '.webp');
 
-  if (fs.existsSync(thumbJpg) && fs.statSync(thumbJpg).size > 200) {
-    fs.copyFileSync(thumbJpg, coverPath);
-    return streamFile(res, coverPath);
+  // Check sidecar thumbnails first (fastest path)
+  for (const thumb of [[thumbJpg, 'jpg'], [thumbPng, 'png'], [thumbWebp, 'webp']]) {
+    const thumbPath = thumb[0];
+    if (fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 200) {
+      console.log(`[cover] Using sidecar ${thumb[1]}: ${parsed.name}.${thumb[1]}`);
+      if (thumb[1] !== 'jpg') {
+        // Convert non-JPG to JPG and cache it
+        execFile('ffmpeg', ['-i', thumbPath, '-q:v', '2', '-y', coverPath],
+          { timeout: 5000 }, (err) => {
+            if (err) {
+              console.log(`[cover] Failed to convert ${thumb[1]} to JPG: ${err.message}`);
+              return streamFile(res, thumbPath, `image/${thumb[1]}`);
+            }
+            return streamFile(res, coverPath);
+          });
+      } else {
+        fs.copyFileSync(thumbPath, coverPath);
+        return streamFile(res, coverPath);
+      }
+    }
   }
 
   // Try extracting cover art using ffmpeg with re-encoding (handles non-JPG covers)
+  console.log(`[cover] Extracting embedded cover from: ${playlist}/${file}`);
   execFile('ffmpeg', ['-i', filePath, '-an', '-vcodec', 'mjpeg', '-q:v', '2', '-frames:v', '1', '-update', '1', '-y', coverPath],
-    { timeout: 10000 }, (err) => {
-      if (err || !fs.existsSync(coverPath) || fs.statSync(coverPath).size < 200) {
-        // Try png extraction as fallback
-        const pngPath = coverPath.replace('.jpg', '_tmp.png');
-        execFile('ffmpeg', ['-i', filePath, '-an', '-vcodec', 'png', '-y', pngPath],
-          { timeout: 5000 }, (err2) => {
-            if (!err2 && fs.existsSync(pngPath) && fs.statSync(pngPath).size > 200) {
-              // Convert png to jpg
-              execFile('ffmpeg', ['-i', pngPath, '-q:v', '2', '-y', coverPath],
-                { timeout: 5000 }, () => {
-                  if (fs.existsSync(pngPath)) fs.unlinkSync(pngPath);
-                  if (fs.existsSync(coverPath) && fs.statSync(coverPath).size > 200) {
-                    return streamFile(res, coverPath);
-                  }
-                  // Also check for sidecar webp/png
-                  for (const thumb of [thumbWebp, thumbPng]) {
-                    if (fs.existsSync(thumb) && fs.statSync(thumb).size > 200) {
-                      execFile('ffmpeg', ['-i', thumb, '-q:v', '2', '-y', coverPath],
-                        { timeout: 5000 }, () => {
-                          if (fs.existsSync(coverPath) && fs.statSync(coverPath).size > 200) {
-                            return streamFile(res, coverPath);
-                          }
-                          res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
-                          res.end(generatePlaceholder(parsed.name));
-                        });
-                      return;
-                    }
-                  }
-                  res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
-                  res.end(generatePlaceholder(parsed.name));
-                });
-            } else {
-              // Clean up and check sidecar thumbnails
-              if (fs.existsSync(pngPath)) fs.unlinkSync(pngPath);
-              for (const thumb of [thumbWebp, thumbPng]) {
-                if (fs.existsSync(thumb) && fs.statSync(thumb).size > 200) {
-                  execFile('ffmpeg', ['-i', thumb, '-q:v', '2', '-y', coverPath],
-                    { timeout: 5000 }, () => {
-                      if (fs.existsSync(coverPath) && fs.statSync(coverPath).size > 200) {
-                        return streamFile(res, coverPath);
-                      }
-                      res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
-                      res.end(generatePlaceholder(parsed.name));
-                    });
-                  return;
-                }
-              }
-              res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
-              res.end(generatePlaceholder(parsed.name));
-            }
-          });
-        return;
+    { timeout: 10000 }, (err, stdout, stderr) => {
+      if (err) {
+        console.log(`[cover] Failed to extract cover: ${err.message}`);
+      } else if (!fs.existsSync(coverPath) || fs.statSync(coverPath).size < 200) {
+        console.log(`[cover] Extracted cover too small or missing`);
+      } else {
+        console.log(`[cover] Successfully extracted cover (${Math.round(fs.statSync(coverPath).size / 1024)}KB)`);
+        return streamFile(res, coverPath);
       }
-      streamFile(res, coverPath);
+
+      // Try png extraction as fallback
+      console.log(`[cover] Trying PNG extraction as fallback...`);
+      const pngPath = coverPath.replace('.jpg', '_tmp.png');
+      execFile('ffmpeg', ['-i', filePath, '-an', '-vcodec', 'png', '-y', pngPath],
+        { timeout: 5000 }, (err2) => {
+          if (!err2 && fs.existsSync(pngPath) && fs.statSync(pngPath).size > 200) {
+            console.log(`[cover] PNG extraction successful, converting to JPG...`);
+            // Convert png to jpg
+            execFile('ffmpeg', ['-i', pngPath, '-q:v', '2', '-y', coverPath],
+              { timeout: 5000 }, () => {
+                if (fs.existsSync(pngPath)) fs.unlinkSync(pngPath);
+                if (fs.existsSync(coverPath) && fs.statSync(coverPath).size > 200) {
+                  return streamFile(res, coverPath);
+                }
+                console.log(`[cover] PNG to JPG conversion failed, using placeholder`);
+                res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+                res.end(generatePlaceholder(parsed.name));
+              });
+          } else {
+            console.log(`[cover] All extraction methods failed, using placeholder`);
+            // Clean up
+            if (fs.existsSync(pngPath)) fs.unlinkSync(pngPath);
+            res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+            res.end(generatePlaceholder(parsed.name));
+          }
+        });
     });
 });
 

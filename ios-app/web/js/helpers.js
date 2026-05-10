@@ -15,7 +15,7 @@ function songItemHTML(s, listId) {
   const dur = s.duration ? formatTime(s.duration) : '';
   const esc = k.replace(/'/g, "\\'");
   return `<div class="song-item" data-key="${k}" data-list="${listId}" onclick="playSongFromList('${esc}','${listId}')" role="button" aria-label="Play ${s.title||''}">
-    <div class="song-art"><img src="${coverUrl(s)}" alt="" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="song-art"><img src="${coverUrl(s)}" alt="" loading="lazy" onerror="onImageError(this)"></div>
     <div class="song-info"><div class="song-title">${s.title||''}</div><div class="song-meta">${s.artist||'Unknown'}${s.album?' · '+s.album:''}</div></div>
     ${dur?`<span class="song-dur">${dur}</span>`:''}
     ${liked?'<span class="song-liked-badge" aria-label="Liked"><svg class="icon-xs" style="color:#fc3c44"><use href="#icon-heart-filled"/></svg></span>':''}
@@ -47,7 +47,7 @@ function showContextMenu(key) {
   document.getElementById('ctxTitle').textContent = s.title;
   document.getElementById('ctxArtist').textContent = s.artist || 'Unknown';
   const art = document.getElementById('ctxArt');
-  art.src = coverUrl(s); art.onerror = () => art.style.display = 'none'; art.style.display = '';
+  art.src = coverUrl(s); art.onerror = () => onImageError(art); art.style.display = '';
   document.getElementById('ctxLikeBtn').innerHTML = liked
     ? '<svg class="icon-ctx"><use href="#icon-heart-filled"/></svg> Unlike'
     : '<svg class="icon-ctx"><use href="#icon-heart"/></svg> Like';

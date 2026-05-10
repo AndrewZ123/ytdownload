@@ -664,7 +664,7 @@ function updatePlayerUI(isOffline) {
   const s = currentSong;
   // Full player
   const art = document.getElementById('fpArt');
-  if (art) { art.src = coverUrl(s); art.onerror = () => art.style.display = 'none'; art.style.display = ''; }
+  if (art) { art.src = coverUrl(s); art.onerror = () => onImageError(art); art.style.display = ''; }
   const title = document.getElementById('fpTitle');
   if (title) title.textContent = s.title;
   const artist = document.getElementById('fpArtist');
@@ -697,7 +697,7 @@ function updatePlayerUI(isOffline) {
   const ma = document.getElementById('miniArtist');
   if (ma) ma.textContent = s.artist || 'Unknown';
   const mart = document.getElementById('miniArt');
-  if (mart) { mart.src = coverUrl(s); mart.onerror = () => mart.style.display = 'none'; }
+  if (mart) { mart.src = coverUrl(s); mart.onerror = () => onImageError(mart); }
 }
 
 function updateFpLikeBtn() {

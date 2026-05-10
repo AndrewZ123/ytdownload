@@ -14,7 +14,7 @@ function renderListenNow() {
   if (!el) return;
   const recent = songs.slice(-6).reverse();
   el.innerHTML = recent.map(s => `<div class="card" onclick="playSongFromList('${songKey(s)}','recent')">
-    <div class="card-art"><img src="${coverUrl(s)}" alt="" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-art"><img src="${coverUrl(s)}" alt="" loading="lazy" onerror="onImageError(this)"></div>
     <div class="card-title">${s.title||''}</div>
     <div class="card-sub">${s.artist||''}</div>
   </div>`).join('');
@@ -29,7 +29,7 @@ function renderHistoryCards() {
   const recent = historyItems.slice(0, 8).map(h => h.data).filter(Boolean);
   if (recent.length === 0) { el.innerHTML = ''; return; }
   el.innerHTML = recent.map(s => `<div class="card" onclick="playSongFromList('${songKey(s)}','history')">
-    <div class="card-art"><img src="${coverUrl(s)}" alt="" loading="lazy" onerror="this.style.display='none'"></div>
+    <div class="card-art"><img src="${coverUrl(s)}" alt="" loading="lazy" onerror="onImageError(this)"></div>
     <div class="card-title">${s.title||''}</div>
     <div class="card-sub">${s.artist||''}</div>
   </div>`).join('');
@@ -50,7 +50,7 @@ function renderLibPlaylists() {
     const pSongs = songs.filter(s => s.playlist === name);
     const first = pSongs[0];
     return `<div class="card" onclick="openPlaylist('${name.replace(/'/g, "\\'")}')">
-      <div class="card-art"><img src="${first ? coverUrl(first) : ''}" alt="" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="card-art"><img src="${first ? coverUrl(first) : _placeholderSvg}" alt="" loading="lazy" onerror="onImageError(this)"></div>
       <div class="card-title">${name}</div>
       <div class="card-sub">${pSongs.length} song${pSongs.length!==1?'s':''}</div>
     </div>`;
@@ -81,7 +81,7 @@ function renderLibAlbums() {
     const aSongs = albumMap[name];
     const first = aSongs[0];
     return `<div class="card" onclick="openAlbum('${name.replace(/'/g, "\\'")}')">
-      <div class="card-art"><img src="${first ? coverUrl(first) : ''}" alt="" loading="lazy" onerror="this.style.display='none'"></div>
+      <div class="card-art"><img src="${first ? coverUrl(first) : _placeholderSvg}" alt="" loading="lazy" onerror="onImageError(this)"></div>
       <div class="card-title">${name}</div>
       <div class="card-sub">${aSongs.length} song${aSongs.length!==1?'s':''}</div>
     </div>`;
@@ -132,7 +132,7 @@ function openPlaylist(name) {
   document.getElementById('pvName').textContent = name;
   document.getElementById('pvCount').textContent = pSongs.length + ' song' + (pSongs.length !== 1 ? 's' : '');
   const artEl = document.getElementById('pvArt');
-  if (artEl) { artEl.src = first ? coverUrl(first) : ''; artEl.onerror = () => artEl.style.display = 'none'; }
+  if (artEl) { artEl.src = first ? coverUrl(first) : _placeholderSvg; artEl.onerror = () => onImageError(artEl); }
   document.getElementById('pvSongs').innerHTML = pSongs.map(s => songItemHTML(s, 'playlist')).join('');
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('playlistView')?.classList.add('active');
@@ -173,7 +173,7 @@ function openAlbum(name) {
   document.getElementById('pvCount').textContent = aSongs.length + ' song' + (aSongs.length !== 1 ? 's' : '');
   const hero = document.querySelector('.playlist-hero .art');
   const first = aSongs[0];
-  if (hero) hero.innerHTML = `<img id="pvArt" src="${first ? coverUrl(first) : ''}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:16px">`;
+  if (hero) hero.innerHTML = `<img id="pvArt" src="${first ? coverUrl(first) : _placeholderSvg}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:16px" onerror="onImageError(this)">`;
   document.getElementById('pvSongs').innerHTML = aSongs.map(s => songItemHTML(s, 'playlist')).join('');
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('playlistView')?.classList.add('active');

@@ -17,6 +17,8 @@
  * The new approach proxies through our backend with signed tokens.
  */
 
+const http = require('http');
+const https = require('https');
 const resolver = require('../lib/resolver');
 const streamProxy = require('../lib/stream-proxy');
 const playTokens = require('../lib/play-tokens');
@@ -564,5 +566,42 @@ module.exports = function(app, deps) {
     }
   });
 
-  console.log('[streaming] ✅ Routes registered: POST /play, GET /stream/:token, events, stats');
+  // ==================== IMAGE PROXY ====================
+  // Proxies external images so the iOS app can load them without CORS/ATS issues.
+  // Used by browse.js discovery cards and as a general image proxy.
+  app.get('/api/proxy/image', async (req, res) => {
+    try {
+      const imageUrl = req.query.url;
+      if (!imageUrl) return res.status(400).send('Missing url parameter');
+
+      // Only allow http(s) URLs
+      if (!/^https?:\/\//i.test(imageUrl)) return res.status(400).send('Invalid URL');
+
+      const httpMod = imageUrl.startsWith('https') ? https : http;
+
+      httpMod.get(imageUrl, { timeout: 10000 }, (imgRes) => {
+        if (imgRes.statusCode >= 300 && imgRes.statusCode < 400 && imgRes.headers.location) {
+          // Follow redirect
+          const redirectUrl = new URL(imgRes.headers.location, imageUrl).href;
+          const redirMod = redirectUrl.startsWith('https') ? https : http;
+          redirMod.get(redirectUrl, { timeout: 10000 }, (redirRes) => {
+            res.set('Content-Type', redirRes.headers['content-type'] || 'image/jpeg');
+            res.set('Cache-Control', 'public, max-age=86400');
+            redirRes.pipe(res);
+          }).on('error', () => res.status(502).send('Image fetch failed'));
+          return;
+        }
+
+        res.set('Content-Type', imgRes.headers['content-type'] || 'image/jpeg');
+        res.set('Cache-Control', 'public, max-age=86400');
+        imgRes.pipe(res);
+      }).on('error', () => {
+        if (!res.headersSent) res.status(502).send('Image fetch failed');
+      });
+    } catch (err) {
+      if (!res.headersSent) res.status(500).send('Proxy error');
+    }
+  });
+
+  console.log('[streaming] ✅ Routes registered: POST /play, GET /stream/:token, events, stats, proxy/image');
 };

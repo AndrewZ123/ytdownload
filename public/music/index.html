@@ -654,7 +654,20 @@ function songItemHTML(song) {
   const isAdding = state.addingIds.has(song.id);
   const isYT = song.isYouTube;
   const isPlaying = state.currentSong && state.currentSong.id === song.id;
-  const covUrl = song.coverUrl || coverUrl(song.playlist, song.file);
+  
+  // Smart cover URL resolution with YouTube thumbnail fallback
+  let covUrl = song.coverUrl;
+  if (!covUrl) {
+    // If song has a YouTube video ID, use YouTube thumbnail
+    const ytId = song.videoId || song.ytId || song.id;
+    if (ytId && /^[a-zA-Z0-9_-]{11}$/.test(ytId)) {
+      covUrl = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
+    } else {
+      // Fall back to server cover extraction
+      covUrl = coverUrl(song.playlist, song.file);
+    }
+  }
+  
   return `<li class="song-item${isAdding?' adding':''}${isPlaying?' playing':''}" data-id="${song.id}" ${!isYT?'data-playlist="'+esc(song.playlist)+'"':''} data-file="${esc(song.file||'')}" data-title="${esc(song.title)}" data-artist="${esc(song.artist||'')}" data-cover="${esc(covUrl)}" data-duration="${song.duration||0}" data-youtube="${isYT?1:0}">
     <div class="art">${artHTML(covUrl)}</div>
     <div class="info"><div class="title">${esc(song.title)}</div><div class="subtitle">${esc(song.artist||'Unknown Artist')}</div></div>
