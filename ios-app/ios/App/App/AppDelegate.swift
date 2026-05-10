@@ -46,11 +46,40 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
 
-    func applicationWillResignActive(_ application: UIApplication) {}
-    func applicationDidEnterBackground(_ application: UIApplication) {}
-    func applicationWillEnterForeground(_ application: UIApplication) {}
-    func applicationDidBecomeActive(_ application: UIApplication) {}
-    func applicationWillTerminate(_ application: UIApplication) {}
+    func applicationWillResignActive(_ application: UIApplication) {
+        // Keep audio session active for background playback
+    }
+
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        // Audio session stays active — .playback category supports background audio
+    }
+
+    func applicationWillEnterForeground(_ application: UIApplication) {
+        // Re-activate audio session when returning from background
+        // This is critical: iOS can deactivate the session after extended background time
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true)
+            print("[AppDelegate] ✅ Audio session re-activated on foreground")
+        } catch {
+            print("[AppDelegate] ⚠️ Audio session re-activation failed: \(error)")
+        }
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        // Ensure session is active after any interruption
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("[AppDelegate] ⚠️ Audio session activation on becomeActive failed: \(error)")
+        }
+    }
+
+    func applicationWillTerminate(_ application: UIApplication) {
+        // Clean up audio session
+        try? AVAudioSession.sharedInstance().setActive(false)
+    }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)

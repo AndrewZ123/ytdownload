@@ -1,5 +1,45 @@
 // ===== PLAYER =====
 let _streamLoading = false; // Guard against double-click during stream resolve
+let _retryCount = 0;        // Automatic retry counter (max 1)
+const MAX_RETRY = 1;
+
+// Stream token state for diagnostics and recovery
+const _streamState = {
+  tokenIssuedAt: null,    // Date.now() when token was received
+  tokenExpiresAt: null,   // expiresAt from play response
+  streamUrl: null,        // current signed stream URL
+  videoId: null,          // current video ID
+  wasBackgrounded: false, // whether app was backgrounded during this session
+  lastSafeTime: 0,        // last known safe currentTime (updated periodically)
+};
+
+// ===== REMOTE ERROR LOGGING =====
+function _logPlaybackError(errorCode, errorMessage) {
+  try {
+    const payload = {
+      videoId: _streamState.videoId || (currentSong && currentSong.id),
+      errorCode,
+      errorMessage,
+      currentSrc: audio.currentSrc || '',
+      networkState: audio.networkState,
+      readyState: audio.readyState,
+      tokenAge: _streamState.tokenIssuedAt ? Math.round((Date.now() - _streamState.tokenIssuedAt) / 1000) : null,
+      tokenExpiresAt: _streamState.tokenExpiresAt,
+      wasBackgrounded: _streamState.wasBackgrounded,
+      playbackState: audio.paused ? 'paused' : 'playing',
+      userAgent: navigator.userAgent,
+    };
+
+    // Fire-and-forget to server
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API}/api/events/playback-error`, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.timeout = 5000;
+    xhr.send(JSON.stringify(payload));
+  } catch (e) {
+    // Silently ignore — we don't want logging to cause more errors
+  }
+}
 
 function togglePlay() {
   // Don't try to play while a stream is still resolving
@@ -203,6 +243,15 @@ async function playStreamSong(song) {
   if (playResponse.artworkUrl) song.coverUrl = playResponse.artworkUrl;
   updatePlayerUI(false);
 
+  // Track stream token state for diagnostics and recovery
+  _streamState.tokenIssuedAt = Date.now();
+  _streamState.tokenExpiresAt = playResponse.streamExpiresAt || null;
+  _streamState.streamUrl = playResponse.streamUrl;
+  _streamState.videoId = videoId;
+  _streamState.wasBackgrounded = false;
+  _streamState.lastSafeTime = 0;
+  _retryCount = 0; // Reset retry counter for new song
+
   // Phase 2: Set audio.src to the signed stream URL and play
   _streamLoading = false;
   audio.src = playResponse.streamUrl;
@@ -226,6 +275,73 @@ async function playStreamSong(song) {
     console.error('[player] ❌ Stream failed for', videoId, err.name, err.message);
     toast('Could not play this song');
     audio.src = '';
+  }
+}
+
+// ===== AUTOMATIC PLAYBACK RECOVERY =====
+// On MEDIA_ERR_NETWORK (2) or MEDIA_ERR_SRC_NOT_SUPPORTED (4), attempt one
+// automatic retry: fetch a fresh token and resume from last known position.
+async function _attemptPlaybackRecovery(errorCode) {
+  if (_retryCount >= MAX_RETRY) {
+    console.log('[player] Recovery: max retries reached, giving up');
+    return false;
+  }
+
+  const videoId = _streamState.videoId || (currentSong && currentSong.id);
+  if (!videoId) return false;
+
+  _retryCount++;
+  console.log(`[player] Recovery: attempt ${_retryCount}/${MAX_RETRY} for ${videoId} (error code ${errorCode})`);
+
+  // Save last known position
+  const resumeTime = _streamState.lastSafeTime || audio.currentTime || 0;
+  audio.pause();
+
+  try {
+    // Fetch a fresh token
+    const freshResponse = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API}/api/play`, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.timeout = 30000;
+      xhr.onload = function() {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(e); }
+        } else { reject(new Error('HTTP ' + xhr.status)); }
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.ontimeout = () => reject(new Error('Timeout'));
+      xhr.send(JSON.stringify({ videoId }));
+    });
+
+    if (!freshResponse || !freshResponse.streamUrl) {
+      console.error('[player] Recovery: no fresh stream URL');
+      return false;
+    }
+
+    // Update stream state
+    _streamState.tokenIssuedAt = Date.now();
+    _streamState.tokenExpiresAt = freshResponse.streamExpiresAt || null;
+    _streamState.streamUrl = freshResponse.streamUrl;
+
+    // Swap source and attempt play
+    audio.src = freshResponse.streamUrl;
+
+    // Seek back to last safe position after metadata loads
+    const seekOnReady = () => {
+      if (resumeTime > 0 && audio.duration) {
+        audio.currentTime = Math.min(resumeTime, audio.duration - 0.5);
+      }
+      audio.removeEventListener('loadedmetadata', seekOnReady);
+    };
+    audio.addEventListener('loadedmetadata', seekOnReady);
+
+    await audio.play();
+    console.log('[player] Recovery: ✅ playback resumed for', videoId, 'at', resumeTime + 's');
+    return true;
+  } catch (recoveryErr) {
+    console.error('[player] Recovery: failed —', recoveryErr.message);
+    return false;
   }
 }
 
@@ -335,15 +451,45 @@ audio.addEventListener('pause', () => {
   if (mpSvg) { const u = mpSvg.querySelector('use') || mpSvg; u.setAttribute('href', '#icon-play'); }
 });
 
-audio.addEventListener('error', () => {
+audio.addEventListener('error', async () => {
   const code = audio.error?.code;
   const msg = audio.error?.message;
   const codeNames = { 1: 'ABORTED', 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' };
   const errName = codeNames[code] || 'UNKNOWN';
   console.warn(`[player] Audio error: ${errName} (code=${code})`, msg || '');
+
+  // Log to server for diagnostics
+  _logPlaybackError(code, msg);
+
+  // Auto-recovery for NETWORK and SRC_NOT_SUPPORTED errors
+  if (code === 2 || code === 4) {
+    const recovered = await _attemptPlaybackRecovery(code);
+    if (recovered) {
+      console.log('[player] ✅ Auto-recovery succeeded');
+      return;
+    }
+  }
+
   if (currentSong && offlineMode) toast('Stream unavailable offline');
   else if (currentSong) toast('Playback error: ' + errName);
 });
+
+// ===== COMPREHENSIVE EVENT INSTRUMENTATION =====
+// Track all media events for diagnostics
+const _mediaEvents = ['loadstart', 'loadedmetadata', 'canplay', 'canplaythrough',
+  'waiting', 'stalled', 'suspend', 'seeking', 'seeked', 'emptied', 'abort'];
+_mediaEvents.forEach(eventName => {
+  audio.addEventListener(eventName, () => {
+    console.log(`[audio] ${eventName} (readyState=${audio.readyState}, networkState=${audio.networkState})`);
+  });
+});
+
+// Track last safe playback position for recovery (every 5 seconds)
+setInterval(() => {
+  if (audio && !audio.paused && audio.currentTime > 0) {
+    _streamState.lastSafeTime = audio.currentTime;
+  }
+}, 5000);
 
 function updatePlayerUI(isOffline) {
   if (!currentSong) return;

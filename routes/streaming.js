@@ -138,30 +138,44 @@ module.exports = function(app, deps) {
       // Step 1: Validate the play token
       const session = playTokens.validateToken(token);
       if (!session) {
-        return res.status(403).json({ error: 'Invalid or expired play token' });
+        // Distinguish expired token from never-valid token
+        const expired = playTokens.isTokenExpired(token);
+        const age = playTokens.getTokenAge(token);
+        console.log(JSON.stringify({
+          type: 'token_validation_failed',
+          tokenPrefix: token.slice(0, 12),
+          expired,
+          ageSeconds: age,
+          clientRange: req.headers.range || null,
+        }));
+        if (expired) {
+          return res.status(419).json({ error: 'Play token expired', code: 'TOKEN_EXPIRED' });
+        }
+        return res.status(403).json({ error: 'Invalid play token', code: 'TOKEN_INVALID' });
       }
 
       const { videoId } = session;
+      const tokenAge = Math.round((Date.now() - session.createdAt) / 1000);
 
       // Step 2: Get a fresh resolution (from cache or re-resolve)
       let resolution = resolver.getFreshResolution(videoId);
       if (!resolution) {
-        console.log(`[stream] Re-resolving expired cache for ${videoId}`);
+        console.log(`[stream] Re-resolving expired cache for ${videoId} (token age: ${tokenAge}s)`);
         try {
           resolution = await resolver.reResolve(videoId);
         } catch (err) {
           console.error(`[stream] Re-resolve failed for ${videoId}:`, err.message);
-          return res.status(502).json({ error: 'Stream source expired and could not be refreshed' });
+          return res.status(502).json({ error: 'Stream source expired and could not be refreshed', code: 'UPSTREAM_EXPIRED' });
         }
       }
 
       if (!resolution || !resolution.upstreamUrl) {
-        return res.status(502).json({ error: 'No upstream URL available' });
+        return res.status(502).json({ error: 'No upstream URL available', code: 'NO_UPSTREAM' });
       }
 
       // Step 3: Proxy the stream with Range support
-      console.log(`[stream] Proxying ${videoId} (Range: ${req.headers.range || 'none'})`);
-      await streamProxy.proxyStream(resolution, req, res);
+      console.log(`[stream] Proxying ${videoId} (Range: ${req.headers.range || 'none'}, token age: ${tokenAge}s)`);
+      await streamProxy.proxyStream(resolution, req, res, tokenAge);
 
     } catch (err) {
       console.error('[stream] Unexpected error:', err.message);
@@ -405,6 +419,107 @@ module.exports = function(app, deps) {
     } catch (err) {
       console.error(`[stream-url] Resolve failed for ${videoId}:`, err.message);
       res.status(502).json({ error: 'Could not resolve stream URL', details: err.message });
+    }
+  });
+
+  // ==================== POST /api/events/playback-error ====================
+  // Remote error logging from the client for diagnostics
+  // Body: { videoId, errorCode, errorMesage, currentSrc, networkState, readyState,
+  //         tokenAge, tokenExpiry, wasBackgrounded, userAgent, appVersion }
+  app.post('/api/events/playback-error', (req, res) => {
+    try {
+      const {
+        videoId, errorCode, errorMessage, currentSrc,
+        networkState, readyState, tokenAge, tokenExpiresAt,
+        wasBackgrounded, userAgent, playbackState,
+      } = req.body;
+
+      const logEntry = {
+        type: 'playback_error',
+        timestamp: new Date().toISOString(),
+        videoId: videoId || null,
+        errorCode: errorCode || null,
+        errorMessage: errorMessage || null,
+        currentSrc: currentSrc ? currentSrc.split('/').slice(-2).join('/') : null, // only token part
+        networkState: networkState ?? null,
+        readyState: readyState ?? null,
+        tokenAge: tokenAge ?? null,
+        tokenExpiresAt: tokenExpiresAt || null,
+        wasBackgrounded: wasBackgrounded || false,
+        playbackState: playbackState || null,
+        userAgent: userAgent || req.headers['user-agent'] || null,
+        ip: req.ip || req.connection?.remoteAddress || null,
+      };
+
+      console.log(JSON.stringify(logEntry));
+
+      // Also log as a listen event for correlation
+      if (videoId) {
+        events.logEvent({
+          videoId,
+          eventType: 'error',
+          sessionId: currentSrc ? currentSrc.split('/').pop()?.slice(0, 12) : undefined,
+          errorCode,
+          errorMessage,
+          wasBackgrounded,
+        });
+      }
+
+      res.json({ ok: true, logged: true });
+    } catch (err) {
+      console.error('[playback-error] Error:', err.message);
+      res.status(500).json({ error: 'Failed to log playback error' });
+    }
+  });
+
+  // ==================== GET /api/debug/play-session/:token ====================
+  // Debug endpoint for introspecting a play session
+  app.get('/api/debug/play-session/:token', (req, res) => {
+    try {
+      const { token } = req.params;
+      const session = playTokens.getSession(token);
+
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found (token never existed or was pruned)' });
+      }
+
+      const now = Date.now();
+      const age = Math.round((now - session.createdAt) / 1000);
+      const expiresInSeconds = Math.round((session.expiresAt - now) / 1000);
+
+      // Check if upstream resolution is still available
+      const resolution = resolver.getFreshResolution(session.videoId);
+
+      res.json({
+        session: {
+          token: session.token.slice(0, 12) + '...',
+          videoId: session.videoId,
+          title: session.title,
+          artist: session.artist,
+          status: session.status,
+          audioMime: session.audioMime,
+          contentLength: session.contentLength,
+          createdAt: new Date(session.createdAt).toISOString(),
+          completedAt: session.completedAt ? new Date(session.completedAt).toISOString() : null,
+          ageSeconds: age,
+          expiresInSeconds,
+          isExpired: now > session.expiresAt,
+        },
+        upstream: resolution ? {
+          hasUpstream: true,
+          sourceId: resolution.sourceId,
+          audioMime: resolution.audioMime,
+          contentLength: resolution.contentLength,
+          cached: true,
+        } : {
+          hasUpstream: false,
+          cached: false,
+          note: 'Upstream URL expired from resolver cache',
+        },
+      });
+    } catch (err) {
+      console.error('[debug/play-session] Error:', err.message);
+      res.status(500).json({ error: 'Debug endpoint error' });
     }
   });
 

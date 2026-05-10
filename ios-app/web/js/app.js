@@ -55,6 +55,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     toast('You are offline');
   });
 
+  // ===== APP LIFECYCLE: Background/Foreground handling =====
+  // Track background state for playback diagnostics and recovery
+  function _onAppBackground() {
+    console.log('[lifecycle] App backgrounded');
+    if (typeof _streamState !== 'undefined') {
+      _streamState.wasBackgrounded = true;
+      _streamState.lastSafeTime = audio.currentTime || _streamState.lastSafeTime || 0;
+    }
+    // Persist playback context for recovery
+    try {
+      localStorage.setItem('_playbackCtx', JSON.stringify({
+        videoId: _streamState?.videoId || (currentSong && currentSong.id),
+        currentTime: audio.currentTime || 0,
+        wasPlaying: !audio.paused,
+        tokenIssuedAt: _streamState?.tokenIssuedAt,
+        tokenExpiresAt: _streamState?.tokenExpiresAt,
+        backgroundedAt: Date.now(),
+      }));
+    } catch(e) {}
+  }
+
+  function _onAppForeground() {
+    console.log('[lifecycle] App foregrounded');
+    // Check if we need to refresh an expired/nearly-expired token
+    try {
+      const ctx = JSON.parse(localStorage.getItem('_playbackCtx') || 'null');
+      if (!ctx || !ctx.videoId) return;
+
+      const now = Date.now();
+      const backgroundedDuration = ctx.backgroundedAt ? (now - ctx.backgroundedAt) / 1000 : 0;
+      const tokenAge = ctx.tokenIssuedAt ? (now - ctx.tokenIssuedAt) / 1000 : Infinity;
+      const tokenExpiresIn = ctx.tokenExpiresAt ? (ctx.tokenExpiresAt - now) / 1000 : 0;
+
+      console.log(`[lifecycle] Background for ${backgroundedDuration.toFixed(0)}s, token age ${tokenAge.toFixed(0)}s, expires in ${tokenExpiresIn.toFixed(0)}s`);
+
+      // If token is expired or expiring within 2 minutes, and audio was playing, silently refresh
+      if (tokenExpiresIn < 120 && ctx.wasPlaying && audio.paused && currentSong) {
+        console.log('[lifecycle] Token nearly expired, refreshing before user interaction');
+        _retryCount = 0; // Allow one retry
+        _attemptPlaybackRecovery(4).then(recovered => {
+          if (recovered) {
+            console.log('[lifecycle] ✅ Silent token refresh succeeded');
+          } else {
+            console.log('[lifecycle] Silent token refresh failed — will retry on next user action');
+          }
+        });
+      }
+
+      localStorage.removeItem('_playbackCtx');
+    } catch(e) {
+      console.error('[lifecycle] Foreground recovery error:', e);
+    }
+  }
+
+  // Standard Page Visibility API (works in WebView)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) _onAppBackground();
+    else _onAppForeground();
+  });
+
+  // Capacitor lifecycle events (more reliable on iOS)
+  if (window.Capacitor) {
+    Capacitor.Plugins.App?.addListener('appStateChange', (state) => {
+      if (!state.isActive) _onAppBackground();
+      else _onAppForeground();
+    });
+  }
+
   // Context menu actions
   document.getElementById('ctxLikeBtn')?.addEventListener('click', () => {
     const key = state_contextKey;
