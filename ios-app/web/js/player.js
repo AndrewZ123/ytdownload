@@ -524,6 +524,141 @@ setInterval(() => {
   }
 }, 5000);
 
+// ===== NATIVE EVENT RECEIVER =====
+// Receives events from AppDelegate (audio interruptions) via evaluateJavaScript
+window._nativeEventReceiver = function(event) {
+  console.log('[player] Native event:', event);
+
+  switch (event) {
+    case 'audioInterruptionBegan':
+      // Audio was interrupted (phone call, alarm, etc.) — pause to avoid broken state
+      _streamState.wasBackgrounded = true;
+      if (!audio.paused) {
+        console.log('[player] Pausing due to audio interruption');
+        audio.pause();
+      }
+      break;
+
+    case 'audioInterruptionEndedShouldResume':
+      // Interruption ended and iOS says we should resume
+      console.log('[player] Interruption ended — resuming playback');
+      if (audio.paused && currentSong) {
+        audio.play().catch(e => console.warn('[player] Resume after interruption failed:', e.message));
+      }
+      _streamState.wasBackgrounded = false;
+      break;
+
+    case 'audioInterruptionEnded':
+      // Interruption ended but we shouldn't auto-resume (user should tap play)
+      console.log('[player] Interruption ended — not auto-resuming');
+      _streamState.wasBackgrounded = false;
+      break;
+  }
+};
+
+// ===== APP LIFECYCLE HANDLING =====
+// Detect background/foreground transitions in the WebView
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    // App going to background
+    _streamState.wasBackgrounded = true;
+    console.log('[player] App backgrounded — current time:', audio.currentTime,
+      'token age:', _streamState.tokenIssuedAt ? Math.round((Date.now() - _streamState.tokenIssuedAt) / 1000) + 's' : 'n/a');
+  } else {
+    // App returning to foreground — check token health
+    console.log('[player] App foregrounded — checking token health');
+    _checkTokenHealthOnForeground();
+  }
+});
+
+// Also listen for Capacitor-specific lifecycle events if available
+if (window.Capacitor) {
+  window.Capacitor.addListener?.('appStateChange', (state) => {
+    if (!state.isActive) {
+      _streamState.wasBackgrounded = true;
+    } else {
+      _checkTokenHealthOnForeground();
+    }
+  });
+}
+
+/**
+ * On foreground resume, check if the current stream token is still valid.
+ * If nearly expired or expired, proactively refresh it before the user hits play again.
+ */
+async function _checkTokenHealthOnForeground() {
+  const { tokenIssuedAt, tokenExpiresAt, videoId } = _streamState;
+
+  // No active stream — nothing to check
+  if (!tokenIssuedAt || !videoId) return;
+
+  const now = Date.now();
+  const tokenAge = Math.round((now - tokenIssuedAt) / 1000);
+  const expiresAt = tokenExpiresAt ? new Date(tokenExpiresAt).getTime() : 0;
+  const remainingMs = expiresAt - now;
+
+  console.log(`[player] Token health: age=${tokenAge}s, remaining=${Math.round(remainingMs / 1000)}s, videoId=${videoId}`);
+
+  // If token has more than 2 minutes left, it's fine
+  if (remainingMs > 120000) {
+    console.log('[player] Token still healthy — no action needed');
+    return;
+  }
+
+  // Token is expired or nearly expired — proactively refresh
+  console.log('[player] Token expired or nearly expired — proactively refreshing...');
+
+  // If playback is active, we need to swap the source
+  const wasPlaying = !audio.paused;
+  const resumeTime = audio.currentTime || _streamState.lastSafeTime || 0;
+
+  try {
+    const freshResponse = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API}/api/play`, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.timeout = 30000;
+      xhr.onload = function() {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(e); }
+        } else { reject(new Error('HTTP ' + xhr.status)); }
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.ontimeout = () => reject(new Error('Timeout'));
+      xhr.send(JSON.stringify({ videoId }));
+    });
+
+    if (freshResponse && freshResponse.streamUrl) {
+      console.log('[player] Proactive token refresh succeeded for', videoId);
+      _streamState.tokenIssuedAt = Date.now();
+      _streamState.tokenExpiresAt = freshResponse.streamExpiresAt || null;
+      _streamState.streamUrl = freshResponse.streamUrl;
+
+      // Swap source silently
+      audio.src = freshResponse.streamUrl;
+
+      // Restore position
+      if (resumeTime > 0) {
+        const seekOnReady = () => {
+          if (audio.duration && resumeTime < audio.duration) {
+            audio.currentTime = resumeTime;
+          }
+          audio.removeEventListener('loadedmetadata', seekOnReady);
+        };
+        audio.addEventListener('loadedmetadata', seekOnReady);
+      }
+
+      // Resume playback if it was active before
+      if (wasPlaying) {
+        audio.play().catch(e => console.warn('[player] Resume after token refresh failed:', e.message));
+      }
+    }
+  } catch (err) {
+    console.warn('[player] Proactive token refresh failed:', err.message);
+    // Don't show error to user — they haven't pressed anything yet
+  }
+}
+
 function updatePlayerUI(isOffline) {
   if (!currentSong) return;
   const s = currentSong;

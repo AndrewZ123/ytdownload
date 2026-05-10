@@ -8,15 +8,77 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
-            try AVAudioSession.sharedInstance().setActive(true)
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true)
+
+            // Handle audio interruptions (phone calls, alarms, Siri, etc.)
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleAudioInterruption(_:)),
+                name: AVAudioSession.interruptionNotification,
+                object: session
+            )
         } catch {
-            print("Failed to set audio session category: \(error)")
+            print("[AppDelegate] Failed to set audio session category: \(error)")
         }
         setupRemoteCommandCenter()
         return true
+    }
+
+    @objc private func handleAudioInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+
+        switch type {
+        case .began:
+            print("[AppDelegate] 🔇 Audio interruption began (phone call, alarm, etc.)")
+            // Notify WebView that audio was interrupted
+            DispatchQueue.main.async {
+                self.notifyWebView(event: "audioInterruptionBegan")
+            }
+
+        case .ended:
+            print("[AppDelegate] 🔊 Audio interruption ended — re-activating session")
+            // Re-activate the audio session and optionally resume playback
+            do {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
+                try AVAudioSession.sharedInstance().setActive(true)
+
+                // Check if we should resume playback
+                if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                    let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                    if options.contains(.shouldResume) {
+                        DispatchQueue.main.async {
+                            self.notifyWebView(event: "audioInterruptionEndedShouldResume")
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            self.notifyWebView(event: "audioInterruptionEnded")
+                        }
+                    }
+                }
+            } catch {
+                print("[AppDelegate] ⚠️ Failed to re-activate session after interruption: \(error)")
+            }
+
+        @unknown default:
+            break
+        }
+    }
+
+    /// Notify the WebView about native events via Capacitor bridge
+    private func notifyWebView(event: String) {
+        guard let vc = window?.rootViewController as? CAPBridgeViewController else { return }
+        vc.webView?.evaluateJavaScript(
+            "if(window._nativeEventReceiver){window._nativeEventReceiver('\(event)')}",
+            completionHandler: nil
+        )
     }
 
     private func setupRemoteCommandCenter() {

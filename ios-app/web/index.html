@@ -321,7 +321,7 @@
   <div class="sheet-header"><h2>Settings</h2><button class="icon-btn" onclick="hideSettings()"><svg class="icon-md"><use href="#icon-x"/></svg></button></div>
   <div class="sheet-body">
     <div class="setting-group">
-      <label class="setting-label">Server</label>
+      <label class="setting-label" onclick="window._debugTapHandler && window._debugTapHandler()">Server</label>
       <div style="color:var(--text2);font-size:14px;padding:8px 0">Oracle Cloud (connected)</div>
     </div>
     <div class="setting-group">
@@ -332,6 +332,14 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Debug Sheet -->
+<div id="debugOverlay" class="sheet-overlay" onclick="hideDebugPanel()" style="display:none"></div>
+<div id="debugSheet" class="sheet" style="display:none">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header"><h2>🔍 Playback Diagnostics</h2><button class="icon-btn" onclick="hideDebugPanel()"><svg class="icon-md"><use href="#icon-x"/></svg></button></div>
+  <div id="debugContent" class="sheet-body" style="max-height:70vh;overflow-y:auto"></div>
 </div>
 
 <!-- Sleep Timer Sheet -->
@@ -367,6 +375,7 @@
 <script src="js/helpers.js"></script>
 <script src="js/browse.js"></script>
 <script src="js/app.js"></script>
+<script src="js/debug.js"></script>
 <script src="js/gestures.js"></script>
 
 </body>
