@@ -50,7 +50,7 @@ function normalizeTrackId(trackId) {
 module.exports = function(app, deps) {
 
   // ==================== POST /api/play ====================
-  // Resolve a track and return a signed stream URL
+  // Resolve a track and return a signed stream URL (blocks until resolved)
   //
   // Request body: { "videoId": "...", "trackId": "..." }
   // Response: { streamUrl, expiresAt, track: { videoId, title, artist, ... } }
@@ -123,6 +123,94 @@ module.exports = function(app, deps) {
       console.log(`[play] ✅ ${videoId} → ${resolution.title} by ${resolution.artist}`);
     } catch (err) {
       console.error('[play] Unexpected error:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // ==================== POST /api/play-quick ====================
+  // Performance improvement #2: Parallel Resolution & Response
+  // Returns immediately if cached, otherwise starts resolution in background
+  //
+  // Request body: { "videoId": "...", "trackId": "..." }
+  // Response: { streamUrl, expiresAt, status: 'ready'|'resolving', track: {...} }
+  //
+  // If cached: Returns streamUrl immediately (status: 'ready')
+  // If not cached: Returns quick response (status: 'resolving'), then client
+  //                should poll /api/youtube/stream-url/:videoId or use WebSocket
+  //
+  app.post('/api/play-quick', async (req, res) => {
+    try {
+      const videoId = req.body.videoId || normalizeTrackId(req.body.trackId);
+
+      if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+        return res.status(400).json({ error: 'Valid videoId or trackId required (11 chars)' });
+      }
+
+      console.log(`[play-quick] Request for ${videoId}`);
+
+      // Check cache first (fast path)
+      const cached = resolver.getFreshResolution(videoId);
+      if (cached && cached.upstreamUrl) {
+        // Cache hit - return immediately
+        const host = getHost(req);
+        const tokenData = playTokens.createToken({
+          videoId: cached.sourceId,
+          title: cached.title,
+          artist: cached.artist,
+          artworkUrl: cached.thumbnail,
+          durationMs: (cached.duration || 0) * 1000,
+          audioMime: cached.audioMime,
+          contentLength: cached.contentLength,
+        }, host);
+
+        events.logEvent({
+          videoId,
+          eventType: 'start',
+          sessionId: tokenData.token.slice(0, 12),
+          title: cached.title,
+          artist: cached.artist,
+        });
+
+        console.log(`[play-quick] ✅ Cache hit for ${videoId}`);
+        return res.json({
+          trackId: videoId,
+          title: cached.title,
+          artist: cached.artist,
+          album: cached.album || '',
+          artworkUrl: cached.thumbnail,
+          durationMs: (cached.duration || 0) * 1000,
+          streamUrl: tokenData.streamUrl,
+          streamExpiresAt: tokenData.expiresAt,
+          audioMime: cached.audioMime,
+          bitrate: cached.bitrate,
+          status: 'ready',
+          cached: true,
+        });
+      }
+
+      // Cache miss - start resolution in background
+      console.log(`[play-quick] Cache miss for ${videoId}, starting background resolution`);
+      
+      // Fire-and-forget resolution
+      resolver.resolve(videoId)
+        .then(resolution => {
+          console.log(`[play-quick] Background resolution complete for ${videoId}`);
+          // In a real implementation, we would notify client via WebSocket
+          // For now, client can poll /api/youtube/stream-url/:videoId
+        })
+        .catch(err => {
+          console.error(`[play-quick] Background resolution failed for ${videoId}:`, err.message);
+        });
+
+      // Return quick response to keep UI responsive
+      res.json({
+        trackId: videoId,
+        status: 'resolving',
+        cached: false,
+        // Client should poll /api/youtube/stream-url/:videoId to get the stream URL
+      });
+    } catch (err) {
+      console.error('[play-quick] Unexpected error:', err);
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -325,6 +413,20 @@ module.exports = function(app, deps) {
               ? (e.thumbnails.find(t => t.width >= 200 && t.width <= 400) || e.thumbnails[e.thumbnails.length - 1]).url
               : (e.id ? `https://img.youtube.com/vi/${e.id}/mqdefault.jpg` : ''),
           }));
+          
+          // Performance improvement #1: Predictive Pre-Resolution
+          // Fire-and-forget pre-resolution for top 5 results (don't await)
+          const topResults = entries.slice(0, 5);
+          topResults.forEach(track => {
+            if (track.id && /^[a-zA-Z0-9_-]{11}$/.test(track.id)) {
+              resolver.resolve(track.id).catch(err => {
+                // Silently fail - this is just pre-warming the cache
+                console.log(`[pre-resolve] Failed for ${track.id}:`, err.message);
+              });
+            }
+          });
+          
+          console.log(`[search] Returned ${entries.length} results, pre-resolving top ${Math.min(5, entries.length)}`);
           res.json({ results: entries, query: q, count: entries.length });
         } catch (parseErr) {
           console.error('[search] JSON parse error:', parseErr.message);
