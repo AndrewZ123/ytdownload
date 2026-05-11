@@ -8,24 +8,56 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
-     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true)
+      func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+         do {
+             let session = AVAudioSession.sharedInstance()
+             try session.setCategory(.playback, mode: .default, options: [])
+             try session.setActive(true)
 
-            // Handle audio interruptions (phone calls, alarms, Siri, etc.)
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(handleAudioInterruption(_:)),
-                name: AVAudioSession.interruptionNotification,
-                object: session
-            )
-        } catch {
-            print("[AppDelegate] Failed to set audio session category: \(error)")
+             // Handle audio interruptions (phone calls, alarms, Siri, etc.)
+             NotificationCenter.default.addObserver(
+                 self,
+                 selector: #selector(handleAudioInterruption(_:)),
+                 name: AVAudioSession.interruptionNotification,
+                 object: session
+             )
+         } catch {
+             print("[AppDelegate] Failed to set audio session category: \(error)")
+         }
+         
+         // Configure WebView to allow HTTP media from capacitor:// origin
+         setupWebViewConfiguration()
+         
+         setupRemoteCommandCenter()
+         return true
+     }
+    
+    /// Configure WebView to allow HTTP audio from custom schemes
+    private func setupWebViewConfiguration() {
+        // This method will be called after the Capacitor bridge is initialized
+        // The actual configuration happens in CAPBridgeViewController, but we'll
+        // set it up via a delayed notification to ensure the WebView is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.configureWebViewMediaPlayback()
         }
-        setupRemoteCommandCenter()
-        return true
+    }
+    
+    private func configureWebViewMediaPlayback() {
+        guard let vc = window?.rootViewController as? CAPBridgeViewController else { return }
+        
+        // Get the WKWebView configuration
+        let config = vc.webView?.configuration
+        config?.mediaTypesRequiringUserActionForPlayback = []
+        config?.allowsInlineMediaPlayback = true
+        
+        // Allow loading from custom schemes
+        vc.webView?.evaluateJavaScript("""
+            // Override any security restrictions for capacitor:// scheme
+            if (!window.__webviewConfigured) {
+                window.__webviewConfigured = true;
+                console.log('[WebView] Configured for HTTP media playback from capacitor://');
+            }
+        """, completionHandler: nil)
     }
 
     @objc private func handleAudioInterruption(_ notification: Notification) {

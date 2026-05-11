@@ -3,15 +3,16 @@
   "appName": "My Music",
   "webDir": "web",
   "server": {
-    "allowNavigation": ["melodia.ddns.net", "157.151.254.26:3000"],
+    "allowNavigation": ["melodia.ddns.net", "157.151.254.26:3000", "amzenterprises.com"],
     "cleartext": true
   },
   "ios": {
-    "allowsLinkPreview": false
+    "allowsLinkPreview": false,
+    "cordovaZeroDelay": true
   },
   "plugins": {
     "CapacitorHttp": {
-      "enabled": true
+      "enabled": false
     }
   }
 }

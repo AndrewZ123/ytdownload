@@ -149,7 +149,7 @@ module.exports = function(app, deps) {
       console.log(`[play-quick] Request for ${videoId}`);
 
       // Check cache first (fast path)
-      const cached = resolver.getFreshResolution(videoId);
+      const cached = await resolver.getFreshResolution(videoId);
       if (cached && cached.upstreamUrl) {
         // Cache hit - return immediately
         const host = getHost(req);
@@ -249,7 +249,7 @@ module.exports = function(app, deps) {
 
       // Step 2: Get a fresh resolution (from cache or re-resolve)
       console.log(`[stream] Getting fresh resolution for ${videoId} (token age: ${tokenAge}s)`);
-      let resolution = resolver.getFreshResolution(videoId);
+      let resolution = await resolver.getFreshResolution(videoId);
       console.log(`[stream] getFreshResolution returned:`, resolution ? `found with upstreamUrl=${!!resolution.upstreamUrl}` : 'null');
       
       if (!resolution) {
@@ -644,7 +644,7 @@ module.exports = function(app, deps) {
   app.get('/api/stream/info/:ytId', async (req, res) => {
     try {
       const { ytId } = req.params;
-      const cached = resolver.getFreshResolution(ytId);
+      const cached = await resolver.getFreshResolution(ytId);
 
       if (cached) {
         return res.json({

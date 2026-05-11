@@ -273,12 +273,55 @@ async function playSong(song) {
       return;
     }
 
-    // Set the stream URL directly with CORS enabled
-    // The native <audio> element in WKWebView handles streaming with proper CORS support
-    // and is optimized for Range requests, seeking, and buffering
-    audio.src = playResponse.streamUrl;
-    audio.crossOrigin = 'anonymous'; // Enable CORS for the audio element
-    console.log('[player] ✅ Set audio src to stream URL with CORS enabled');
+    // On iOS/Capacitor, we need to fetch the audio as a blob to bypass capacitor:// HTTP restriction
+    const isCapacitor = window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+    
+    if (isCapacitor) {
+      console.log('[player] Using XHR to fetch audio blob for iOS');
+      try {
+        // Use XHR to fetch the audio stream as a blob (more reliable than CapacitorHttp for blobs)
+        const blob = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', playResponse.streamUrl, true);
+          xhr.responseType = 'blob';
+          xhr.timeout = 30000; // 30s timeout for blob fetch
+          
+          xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              if (xhr.response instanceof Blob) {
+                resolve(xhr.response);
+              } else {
+                reject(new Error('Response is not a blob'));
+              }
+            } else {
+              reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+            }
+          };
+          
+          xhr.onerror = function() {
+            reject(new Error('Network error fetching audio blob'));
+          };
+          
+          xhr.ontimeout = function() {
+            reject(new Error('Timeout fetching audio blob'));
+          };
+          
+          xhr.send();
+        });
+        
+        const blobUrl = URL.createObjectURL(blob);
+        audio.src = blobUrl;
+        console.log('[player] ✅ Created blob URL for audio playback', blob.type);
+      } catch (blobErr) {
+        console.error('[player] ❌ XHR blob fetch failed:', blobErr);
+        toast('Could not fetch audio stream: ' + blobErr.message);
+        audio.src = '';
+        return;
+      }
+    } else {
+      // On web/browser, use the stream URL directly
+      audio.src = playResponse.streamUrl;
+    }
 
     try {
       await audio.play();
@@ -350,10 +393,36 @@ async function _attemptPlaybackRecovery(errorCode) {
     _streamState.tokenExpiresAt = freshResponse.streamExpiresAt || null;
     _streamState.streamUrl = freshResponse.streamUrl;
 
-    // Set the stream URL directly with CORS enabled
-    audio.src = freshResponse.streamUrl;
-    audio.crossOrigin = 'anonymous';
-    console.log('[player] ✅ Recovery: Set audio src to fresh stream URL with CORS');
+    // On iOS/Capacitor, fetch as blob to bypass capacitor:// restriction
+    const isCapacitor = window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+    
+    if (isCapacitor) {
+      console.log('[player] Recovery: Using XHR to fetch audio blob');
+      try {
+        const blob = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', freshResponse.streamUrl, true);
+          xhr.responseType = 'blob';
+          xhr.timeout = 30000;
+          xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300 && xhr.response instanceof Blob) {
+              resolve(xhr.response);
+            } else {
+              reject(new Error(`HTTP ${xhr.status}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error('Network error'));
+          xhr.ontimeout = () => reject(new Error('Timeout'));
+          xhr.send();
+        });
+        audio.src = URL.createObjectURL(blob);
+      } catch (blobErr) {
+        console.error('[player] Recovery: Blob fetch failed:', blobErr);
+        return false;
+      }
+    } else {
+      audio.src = freshResponse.streamUrl;
+    }
 
     // Seek back to last safe position after metadata loads
     const seekOnReady = () => {
@@ -642,10 +711,37 @@ async function _checkTokenHealthOnForeground() {
       _streamState.tokenExpiresAt = freshResponse.streamExpiresAt || null;
       _streamState.streamUrl = freshResponse.streamUrl;
 
-      // Set the stream URL directly with CORS enabled
-      audio.src = freshResponse.streamUrl;
-      audio.crossOrigin = 'anonymous';
-      console.log('[player] ✅ Token refresh: Set audio src to fresh stream URL with CORS');
+      // On iOS/Capacitor, fetch as blob to bypass capacitor:// restriction
+      const isCapacitor = window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+      
+      if (isCapacitor) {
+        console.log('[player] Token refresh: Using XHR to fetch audio blob');
+        try {
+          const blob = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', freshResponse.streamUrl, true);
+            xhr.responseType = 'blob';
+            xhr.timeout = 30000;
+            xhr.onload = function() {
+              if (xhr.status >= 200 && xhr.status < 300 && xhr.response instanceof Blob) {
+                resolve(xhr.response);
+              } else {
+                reject(new Error(`HTTP ${xhr.status}`));
+              }
+            };
+            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.ontimeout = () => reject(new Error('Timeout'));
+            xhr.send();
+          });
+          audio.src = URL.createObjectURL(blob);
+        } catch (blobErr) {
+          console.error('[player] Token refresh: Blob fetch failed:', blobErr);
+          throw blobErr;
+        }
+      } else {
+        // Swap source silently
+        audio.src = freshResponse.streamUrl;
+      }
 
       // Restore position
       if (resumeTime > 0) {

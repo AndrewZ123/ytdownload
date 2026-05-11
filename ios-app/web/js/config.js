@@ -9,7 +9,7 @@
 //   3. Run: ./setup-https.sh your-domain.com
 //   4. Update this constant to https://your-domain.com
 //   5. Rebuild the iOS app
-const API = 'http://157.151.254.26:3000';
+const API = 'https://amzenterprises.com';
 
 const APP_NAME = 'Melodia';
 const HISTORY_LIMIT = 50;
