@@ -248,11 +248,15 @@ module.exports = function(app, deps) {
       const tokenAge = Math.round((Date.now() - session.createdAt) / 1000);
 
       // Step 2: Get a fresh resolution (from cache or re-resolve)
+      console.log(`[stream] Getting fresh resolution for ${videoId} (token age: ${tokenAge}s)`);
       let resolution = resolver.getFreshResolution(videoId);
+      console.log(`[stream] getFreshResolution returned:`, resolution ? `found with upstreamUrl=${!!resolution.upstreamUrl}` : 'null');
+      
       if (!resolution) {
         console.log(`[stream] Re-resolving expired cache for ${videoId} (token age: ${tokenAge}s)`);
         try {
           resolution = await resolver.reResolve(videoId);
+          console.log(`[stream] Re-resolve succeeded, upstreamUrl=${!!resolution.upstreamUrl}`);
         } catch (err) {
           console.error(`[stream] Re-resolve failed for ${videoId}:`, err.message);
           return res.status(502).json({ error: 'Stream source expired and could not be refreshed', code: 'UPSTREAM_EXPIRED' });
@@ -260,6 +264,10 @@ module.exports = function(app, deps) {
       }
 
       if (!resolution || !resolution.upstreamUrl) {
+        console.error(`[stream] No upstream URL available. Resolution exists: ${!!resolution}, Has upstreamUrl: ${resolution?.upstreamUrl}`);
+        if (resolution) {
+          console.error(`[stream] Resolution keys:`, Object.keys(resolution));
+        }
         return res.status(502).json({ error: 'No upstream URL available', code: 'NO_UPSTREAM' });
       }
 
