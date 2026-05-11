@@ -4,6 +4,9 @@ let _retryCount = 0;        // Automatic retry counter (max 1)
 let _targetVideoId = null;  // Track which song we're trying to play (filters stale errors)
 const MAX_RETRY = 1;
 
+// Active blob URL tracking for cleanup
+let _activeBlobUrl = null;
+
 // Stream token state for diagnostics and recovery
 const _streamState = {
   tokenIssuedAt: null,    // Date.now() when token was received
@@ -40,6 +43,75 @@ function _logPlaybackError(errorCode, errorMessage) {
   } catch (e) {
     // Silently ignore — we don't want logging to cause more errors
   }
+}
+
+// ===== BLOB URL MANAGEMENT =====
+// Clean up the previous blob URL to prevent memory leaks
+function _cleanupBlobUrl() {
+  if (_activeBlobUrl) {
+    try {
+      URL.revokeObjectURL(_activeBlobUrl);
+      console.log('[player] Revoked previous blob URL');
+    } catch (e) {}
+    _activeBlobUrl = null;
+  }
+}
+
+// Fetch a stream URL as a blob and play it via blob URL.
+// This is the ONLY reliable way to play audio in Capacitor's WKWebView
+// because the <audio> element cannot load cross-origin URLs directly.
+function _fetchAndPlayBlob(streamUrl, videoId, options = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', streamUrl, true);
+    xhr.responseType = 'blob';
+    xhr.timeout = 120000; // 2 minutes for large files
+
+    // Show download progress
+    xhr.onprogress = function(e) {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        console.log(`[player] Downloading ${videoId}: ${pct}% (${Math.round(e.loaded/1024)}KB / ${Math.round(e.total/1024)}KB)`);
+        // Update loading toast with progress
+        if (pct < 100) {
+          toast(`Buffering... ${pct}%`);
+        }
+      }
+    };
+
+    xhr.onload = function() {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const blob = xhr.response;
+        console.log(`[player] Blob downloaded: ${Math.round(blob.size/1024)}KB, type=${blob.type}`);
+
+        // Clean up previous blob
+        _cleanupBlobUrl();
+
+        // Create blob URL and track it
+        const blobUrl = URL.createObjectURL(blob);
+        _activeBlobUrl = blobUrl;
+
+        // Set audio source to blob URL (same-origin, no CORS issues)
+        audio.src = blobUrl;
+        console.log('[player] ✅ Set audio.src to blob URL');
+
+        resolve(blobUrl);
+      } else {
+        reject(new Error(`HTTP ${xhr.status} fetching audio blob`));
+      }
+    };
+
+    xhr.onerror = function() {
+      reject(new Error('Network error fetching audio blob'));
+    };
+
+    xhr.ontimeout = function() {
+      reject(new Error('Timeout fetching audio blob (120s)'));
+    };
+
+    console.log(`[player] Fetching blob from ${streamUrl.split('/').slice(-2).join('/')}`);
+    xhr.send();
+  });
 }
 
 function togglePlay() {
@@ -114,6 +186,7 @@ async function playSong(song) {
   if (isSwitchingSongs) {
     console.log('[player] Switching from', currentSong.title, '→', song.title);
     audio.pause();
+    _cleanupBlobUrl();
   }
 
   currentSong = song;
@@ -131,6 +204,7 @@ async function playSong(song) {
     try {
       const stored = await dbGet('songs', key);
       if (stored?.blob) {
+        _cleanupBlobUrl();
         audio.src = URL.createObjectURL(stored.blob);
         await audio.play();
         updatePlayerUI(true);
@@ -142,20 +216,24 @@ async function playSong(song) {
 
   // 2. Online streaming
   if (!offlineMode) {
-    // YouTube stream: use server proxy (reliable, CORS-safe for iOS WKWebView)
+    // YouTube stream: use server proxy (blob-based for iOS WKWebView compatibility)
     if (song.isStream && song.id) {
       return await playStreamSong(song);
     }
 
-    // Library song: stream directly from server
+    // Library song: use blob-based playback for WKWebView compatibility
     try {
-      audio.src = audioUrl(song);
+      const streamUrl = audioUrl(song);
+      console.log('[player] Fetching library song as blob:', streamUrl);
+      toast('Buffering...');
+      await _fetchAndPlayBlob(streamUrl, songKey(song));
       await audio.play();
       updatePlayerUI(false);
       showMiniPlayer();
       updateFpLikeBtn();
       prebufferNext();
       updateNowPlayingInfo();
+      toast(''); // Clear buffering toast
       return;
     } catch(e) {
       console.warn('[player] Library stream failed:', e.name, e.message);
@@ -168,11 +246,11 @@ async function playSong(song) {
   toast('Song not available offline');
 }
 
-  // Stream a YouTube song via the new architecture:
+  // Stream a YouTube song via the blob-based architecture:
   //   1. POST /api/play → server resolves with yt-dlp (cached or fresh), returns signed stream URL
-  //   2. On iOS: Use CapacitorHttp to fetch audio as blob and create blob URL (bypasses capacitor:// HTTP restriction)
-  //   3. On web/browser: Set audio.src directly to the stream URL
-  //   4. Server proxies upstream audio with full HTTP Range support
+  //   2. Fetch the stream URL as a blob via XHR (bypasses WKWebView audio restrictions)
+  //   3. Create a blob URL from the downloaded audio data
+  //   4. Set audio.src to the blob URL (same-origin, no CORS/WKWebView issues)
   //
   // Uses XMLHttpRequest instead of fetch() because CapacitorHttp intercepts fetch()
   // and applies a short native timeout (~10s). XHR is NOT intercepted by CapacitorHttp
@@ -195,7 +273,7 @@ async function playSong(song) {
     // Uses XHR to bypass CapacitorHttp's short timeout
     let playResponse = null;
     try {
-      toast('Loading...');
+      toast('Resolving...');
       console.log('[player] Resolving via POST /play (XHR)', videoId);
 
       playResponse = await new Promise((resolve, reject) => {
@@ -264,21 +342,34 @@ async function playSong(song) {
     _streamState.lastSafeTime = 0;
     _retryCount = 0; // Reset retry counter for new song
 
-    // Phase 2: Set audio source and play
-    _streamLoading = false;
-
     // Skip if user already switched to a different song while we were resolving
     if (_targetVideoId !== videoId) {
       console.log('[player] Stale resolve for', videoId, '— user switched to', _targetVideoId);
+      _streamLoading = false;
       return;
     }
 
-    // Set the stream URL directly with CORS enabled
-    // The native <audio> element in WKWebView handles streaming with proper CORS support
-    // and is optimized for Range requests, seeking, and buffering
-    audio.src = playResponse.streamUrl;
-    audio.crossOrigin = 'anonymous'; // Enable CORS for the audio element
-    console.log('[player] ✅ Set audio src to stream URL with CORS enabled');
+    // Phase 2: Fetch audio as blob and play via blob URL
+    // This is the ONLY reliable approach for Capacitor WKWebView
+    try {
+      toast('Buffering...');
+      await _fetchAndPlayBlob(playResponse.streamUrl, videoId);
+    } catch(blobErr) {
+      console.error('[player] Blob fetch failed for', videoId, blobErr.message);
+      _streamLoading = false;
+      toast('Could not load audio: ' + blobErr.message);
+      audio.src = '';
+      return;
+    }
+
+    // Skip if user switched songs during blob download
+    if (_targetVideoId !== videoId) {
+      console.log('[player] Stale blob for', videoId, '— user switched to', _targetVideoId);
+      _streamLoading = false;
+      return;
+    }
+
+    _streamLoading = false;
 
     try {
       await audio.play();
@@ -287,6 +378,7 @@ async function playSong(song) {
       updateFpLikeBtn();
       prebufferNext();
       updateNowPlayingInfo();
+      toast(''); // Clear buffering toast
       console.log('[player] ✅ Playing', videoId, playResponse.title);
 
       // Send listen event
@@ -300,13 +392,14 @@ async function playSong(song) {
       }
       console.error('[player] ❌ Stream failed for', videoId, err.name, err.message);
       toast('Could not play this song');
+      _cleanupBlobUrl();
       audio.src = '';
     }
   }
 
 // ===== AUTOMATIC PLAYBACK RECOVERY =====
 // On MEDIA_ERR_NETWORK (2) or MEDIA_ERR_SRC_NOT_SUPPORTED (4), attempt one
-// automatic retry: fetch a fresh token and resume from last known position.
+// automatic retry: fetch a fresh token, download blob, and resume from last known position.
 async function _attemptPlaybackRecovery(errorCode) {
   if (_retryCount >= MAX_RETRY) {
     console.log('[player] Recovery: max retries reached, giving up');
@@ -350,10 +443,8 @@ async function _attemptPlaybackRecovery(errorCode) {
     _streamState.tokenExpiresAt = freshResponse.streamExpiresAt || null;
     _streamState.streamUrl = freshResponse.streamUrl;
 
-    // Set the stream URL directly with CORS enabled
-    audio.src = freshResponse.streamUrl;
-    audio.crossOrigin = 'anonymous';
-    console.log('[player] ✅ Recovery: Set audio src to fresh stream URL with CORS');
+    // Fetch as blob and play
+    await _fetchAndPlayBlob(freshResponse.streamUrl, videoId);
 
     // Seek back to last safe position after metadata loads
     const seekOnReady = () => {
@@ -394,6 +485,7 @@ async function playOfflineSong(key) {
     queue = allStored.map(d => d.data);
     queueIndex = queue.findIndex(s => songKey(s) === key);
     if (queueIndex === -1) queueIndex = 0;
+    _cleanupBlobUrl();
     audio.src = URL.createObjectURL(stored.blob);
     currentSong = stored.data;
   audio.play().catch(() => {});
@@ -420,7 +512,9 @@ function prebufferNext() {
       }).catch(() => {});
       return;
     }
-    try { const a = new Audio(); a.src = audioUrl(nextSong); a.preload = 'auto'; prebufferedSong = nextSong; } catch(e) {}
+    // Library songs use blob-based playback - prebuffering via Audio element won't help
+    // since we need to download the entire file first. Skip prebuffer for library songs.
+    prebufferedSong = null;
   }
 }
 
@@ -593,6 +687,8 @@ if (window.Capacitor) {
 /**
  * On foreground resume, check if the current stream token is still valid.
  * If nearly expired or expired, proactively refresh it before the user hits play again.
+ * Since we use blob URLs, the audio data is already in memory — we only need to
+ * refresh if we need to re-fetch (e.g., user seeks beyond buffered range).
  */
 async function _checkTokenHealthOnForeground() {
   const { tokenIssuedAt, tokenExpiresAt, videoId } = _streamState;
@@ -607,66 +703,17 @@ async function _checkTokenHealthOnForeground() {
 
   console.log(`[player] Token health: age=${tokenAge}s, remaining=${Math.round(remainingMs / 1000)}s, videoId=${videoId}`);
 
+  // With blob-based playback, the audio is already downloaded.
+  // No need to refresh the token unless we need to re-fetch the stream.
   // If token has more than 2 minutes left, it's fine
   if (remainingMs > 120000) {
     console.log('[player] Token still healthy — no action needed');
     return;
   }
 
-  // Token is expired or nearly expired — proactively refresh
-  console.log('[player] Token expired or nearly expired — proactively refreshing...');
-
-  // If playback is active, we need to swap the source
-  const wasPlaying = !audio.paused;
-  const resumeTime = audio.currentTime || _streamState.lastSafeTime || 0;
-
-  try {
-    const freshResponse = await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${API}/api/play`, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.timeout = 30000;
-      xhr.onload = function() {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(e); }
-        } else { reject(new Error('HTTP ' + xhr.status)); }
-      };
-      xhr.onerror = () => reject(new Error('Network error'));
-      xhr.ontimeout = () => reject(new Error('Timeout'));
-      xhr.send(JSON.stringify({ videoId }));
-    });
-
-    if (freshResponse && freshResponse.streamUrl) {
-      console.log('[player] Proactive token refresh succeeded for', videoId);
-      _streamState.tokenIssuedAt = Date.now();
-      _streamState.tokenExpiresAt = freshResponse.streamExpiresAt || null;
-      _streamState.streamUrl = freshResponse.streamUrl;
-
-      // Set the stream URL directly with CORS enabled
-      audio.src = freshResponse.streamUrl;
-      audio.crossOrigin = 'anonymous';
-      console.log('[player] ✅ Token refresh: Set audio src to fresh stream URL with CORS');
-
-      // Restore position
-      if (resumeTime > 0) {
-        const seekOnReady = () => {
-          if (audio.duration && resumeTime < audio.duration) {
-            audio.currentTime = resumeTime;
-          }
-          audio.removeEventListener('loadedmetadata', seekOnReady);
-        };
-        audio.addEventListener('loadedmetadata', seekOnReady);
-      }
-
-      // Resume playback if it was active before
-      if (wasPlaying) {
-        audio.play().catch(e => console.warn('[player] Resume after token refresh failed:', e.message));
-      }
-    }
-  } catch (err) {
-    console.warn('[player] Proactive token refresh failed:', err.message);
-    // Don't show error to user — they haven't pressed anything yet
-  }
+  // Token is expired or nearly expired — log it but don't disrupt current playback
+  // (blob is already in memory and playing fine)
+  console.log('[player] Token expired/nearly expired — current blob playback unaffected');
 }
 
 function updatePlayerUI(isOffline) {
